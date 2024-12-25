@@ -1,3 +1,13 @@
+# Fork of ABC: System for Sequential Logic Synthesis and Formal Verification
+
+## Added Features
+
+### `reach` with combinatorial transition relation
+
+Given a transition system $I(x), T(x, x')$, where $|x|= |x'| = n$, and a property $P(x)$, the circuit with inputs $x, x'$ and outputs $(I, T, ~P)$ can be used with `reach -t` to check if the property $P$ will not be violated.
+
+---
+
 [![.github/workflows/build-posix.yml](https://github.com/berkeley-abc/abc/actions/workflows/build-posix.yml/badge.svg)](https://github.com/berkeley-abc/abc/actions/workflows/build-posix.yml)
 [![.github/workflows/build-windows.yml](https://github.com/berkeley-abc/abc/actions/workflows/build-windows.yml/badge.svg)](https://github.com/berkeley-abc/abc/actions/workflows/build-windows.yml)
 [![.github/workflows/build-posix-cmake.yml](https://github.com/berkeley-abc/abc/actions/workflows/build-posix-cmake.yml/badge.svg)](https://github.com/berkeley-abc/abc/actions/workflows/build-posix-cmake.yml)
