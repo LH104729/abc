@@ -256,11 +256,19 @@ int Aig_ManComputeReachable( DdManager * dd, Aig_Man_t * p, DdNode ** pbParts, D
         Cudd_AutodynDisable( dd );
 
     // start the image computation
-    bCubeCs  = Bbr_bddComputeRangeCube( dd, Saig_ManPiNum(p), Saig_ManCiNum(p) );    Cudd_Ref( bCubeCs );
-    if ( pPars->fPartition )
-        pTree = Bbr_bddImageStart( dd, bCubeCs, Saig_ManRegNum(p), pbParts, Saig_ManRegNum(p), dd->vars+Saig_ManCiNum(p), pPars->nBddMax, pPars->fVerbose );
-    else
-        pTree2 = Bbr_bddImageStart2( dd, bCubeCs, Saig_ManRegNum(p), pbParts, Saig_ManRegNum(p), dd->vars+Saig_ManCiNum(p), pPars->fVerbose );
+    if ( pPars->fTransRel ) {
+        bCubeCs = Bbr_bddComputeRangeCube( dd, 0, Saig_ManPiNum(p) / 2);    Cudd_Ref( bCubeCs );
+        if ( pPars->fPartition )
+            pTree = Bbr_bddImageStart( dd, bCubeCs, 1, pbParts, Saig_ManPiNum(p) / 2, dd->vars + Saig_ManPiNum(p) / 2, pPars->nBddMax, pPars->fVerbose );
+        else
+            pTree2 = Bbr_bddImageStart2( dd, bCubeCs, 1, pbParts, Saig_ManPiNum(p) / 2, dd->vars + Saig_ManPiNum(p) / 2, pPars->fVerbose );
+    } else {
+        bCubeCs = Bbr_bddComputeRangeCube( dd, Saig_ManPiNum(p), Saig_ManCiNum(p) );    Cudd_Ref( bCubeCs );
+        if ( pPars->fPartition )
+            pTree = Bbr_bddImageStart( dd, bCubeCs, Saig_ManRegNum(p), pbParts, Saig_ManRegNum(p), dd->vars+Saig_ManCiNum(p), pPars->nBddMax, pPars->fVerbose );
+        else
+            pTree2 = Bbr_bddImageStart2( dd, bCubeCs, Saig_ManRegNum(p), pbParts, Saig_ManRegNum(p), dd->vars+Saig_ManCiNum(p), pPars->fVerbose );
+    }
     Cudd_RecursiveDeref( dd, bCubeCs );
     if ( pTree == NULL )
     {
@@ -328,15 +336,19 @@ int Aig_ManComputeReachable( DdManager * dd, Aig_Man_t * p, DdNode ** pbParts, D
         if ( nBddSize > pPars->nBddMax )
             break;
         // check the result
-        for ( i = 0; i < Saig_ManPoNum(p); i++ )
-        {
-            if ( fCheckOutputs && !Cudd_bddLeq( dd, bNext, Cudd_Not(pbOutputs[i]) ) )
+        if ( pPars->fTransRel ) {
+            i = 2;
+            if ( fCheckOutputs && !Cudd_bddLeq( dd, bNext, Cudd_Not(pbOutputs[0]) ) )
             {
                 DdNode * bIntersect;
-                bIntersect = Cudd_bddIntersect( dd, bNext, pbOutputs[i] );  Cudd_Ref( bIntersect );
+                bIntersect = Cudd_bddIntersect( dd, bNext, pbOutputs[0] );  Cudd_Ref( bIntersect );
                 assert( p->pSeqModel == NULL );
+                if (pPars->fTransRel) {
+                    Abc_Print(1, "Counter-example derivation is not implemented for transition relation.\n");
+                } else {
                 p->pSeqModel = Aig_ManVerifyUsingBddsCountExample( p, dd, pbParts, 
                     vOnionRings, bIntersect, i, pPars->fVerbose, pPars->fSilent ); 
+                }
                 Cudd_RecursiveDeref( dd, bIntersect );
                 if ( !pPars->fSilent )
                     Abc_Print( 1, "Output %d of miter \"%s\" was asserted in frame %d. ", i, p->pName, Vec_PtrSize(vOnionRings) );
@@ -345,9 +357,32 @@ int Aig_ManComputeReachable( DdManager * dd, Aig_Man_t * p, DdNode ** pbParts, D
                 pPars->iFrame = nIters;
                 break;
             }
+        } else {
+            for ( i = 0; i < Saig_ManPoNum(p); i++ )
+            {
+                if ( fCheckOutputs && !Cudd_bddLeq( dd, bNext, Cudd_Not(pbOutputs[i]) ) )
+                {
+                    DdNode * bIntersect;
+                    bIntersect = Cudd_bddIntersect( dd, bNext, pbOutputs[i] );  Cudd_Ref( bIntersect );
+                    assert( p->pSeqModel == NULL );
+                    if (pPars->fTransRel) {
+                        Abc_Print(1, "Counter-example derivation is not implemented for transition relation.\n");
+                    } else {
+                    p->pSeqModel = Aig_ManVerifyUsingBddsCountExample( p, dd, pbParts, 
+                        vOnionRings, bIntersect, i, pPars->fVerbose, pPars->fSilent ); 
+                    }
+                    Cudd_RecursiveDeref( dd, bIntersect );
+                    if ( !pPars->fSilent )
+                        Abc_Print( 1, "Output %d of miter \"%s\" was asserted in frame %d. ", i, p->pName, Vec_PtrSize(vOnionRings) );
+                    Cudd_RecursiveDeref( dd, bReached );
+                    bReached = NULL;
+                    pPars->iFrame = nIters;
+                    break;
+                }
+            }
+            if ( i < Saig_ManPoNum(p) )
+                break;
         }
-        if ( i < Saig_ManPoNum(p) )
-            break;
         // get the new states
         bCurrent = Cudd_bddAnd( dd, bNext, Cudd_Not(bReached) );        Cudd_Ref( bCurrent );
         Vec_PtrPush( vOnionRings, bCurrent );  Cudd_Ref( bCurrent );
@@ -376,9 +411,15 @@ int Aig_ManComputeReachable( DdManager * dd, Aig_Man_t * p, DdNode ** pbParts, D
 
         if ( pPars->fVerbose )
         {
-            double nMints = Cudd_CountMinterm(dd, bReached, Saig_ManRegNum(p) );
-//            Extra_bddPrint( dd, bReached );printf( "\n" );
-            fprintf( stdout, "Reachable states = %.0f. (Ratio = %.4f %%)\n", nMints, 100.0*nMints/pow(2.0, Saig_ManRegNum(p)) );
+            double nMints;
+            if ( pPars->fTransRel) {
+                nMints = Cudd_CountMinterm(dd, bReached, Saig_ManPiNum(p) / 2 );
+                fprintf( stdout, "Reachable states = %.0f. (Ratio = %.4f %%)\n", nMints, 100.0*nMints/pow(2.0, Saig_ManPiNum(p) / 2) );
+            } else {
+                nMints = Cudd_CountMinterm(dd, bReached, Saig_ManRegNum(p) );
+    //            Extra_bddPrint( dd, bReached );printf( "\n" );
+                fprintf( stdout, "Reachable states = %.0f. (Ratio = %.4f %%)\n", nMints, 100.0*nMints/pow(2.0, Saig_ManRegNum(p)) );
+            }
             fflush( stdout ); 
         }
 
@@ -398,12 +439,21 @@ int Aig_ManComputeReachable( DdManager * dd, Aig_Man_t * p, DdNode ** pbParts, D
     // report the stats
     if ( pPars->fVerbose )
     {
-        double nMints = Cudd_CountMinterm(dd, bReached, Saig_ManRegNum(p) );
+        double nMints;
+        if ( pPars->fTransRel ) {
+            nMints = Cudd_CountMinterm(dd, bReached, Saig_ManPiNum(p) / 2 );
+        } else {
+            nMints = Cudd_CountMinterm(dd, bReached, Saig_ManRegNum(p) );
+        }
         if ( nIters > pPars->nIterMax || nBddSize > pPars->nBddMax )
             fprintf( stdout, "Reachability analysis is stopped after %d frames.\n", nIters );
         else
             fprintf( stdout, "Reachability analysis completed after %d frames.\n", nIters );
-        fprintf( stdout, "Reachable states = %.0f. (Ratio = %.4f %%)\n", nMints, 100.0*nMints/pow(2.0, Saig_ManRegNum(p)) );
+        if ( pPars->fTransRel ) {
+            fprintf( stdout, "Reachable states = %.0f. (Ratio = %.4f %%)\n", nMints, 100.0*nMints/pow(2.0, Saig_ManPiNum(p) / 2) );
+        } else {
+            fprintf( stdout, "Reachable states = %.0f. (Ratio = %.4f %%)\n", nMints, 100.0*nMints/pow(2.0, Saig_ManRegNum(p)) );
+        }
         fflush( stdout );
     }
 //ABC_PRB( dd, bReached );
@@ -445,8 +495,14 @@ int Aig_ManVerifyUsingBdds_int( Aig_Man_t * p, Saig_ParBbr_t * pPars )
     abctime clk = Abc_Clock();
     Vec_Ptr_t * vOnionRings;
 
-    assert( Saig_ManRegNum(p) > 0 );
+    if (pPars->fTransRel) {
+        assert ( Saig_ManRegNum(p) == 0 );
+        assert ( Saig_ManPiNum(p) % 2 == 0 );
+    } else {
+        assert( Saig_ManRegNum(p) > 0 );
+    }
 
+    // combinatorial part
     // compute the global BDDs of the latches
     dd = Aig_ManComputeGlobalBdds( p, pPars->nBddMax, 1, pPars->fReorder, pPars->fVerbose );    
     if ( dd == NULL )
@@ -469,35 +525,95 @@ int Aig_ManVerifyUsingBdds_int( Aig_Man_t * p, Saig_ParBbr_t * pPars )
     // start the onion rings
     vOnionRings = Vec_PtrAlloc( 1000 );
 
-    // save outputs
-    pbOutputs = Aig_ManCreateOutputs( dd, p );
+    if (pPars->fTransRel) {
+        if (Saig_ManPoNum(p) != 3) {
+            printf( "The circuit should have exactly 2 POs for initial condition, transition relation and property.\n" );
+            Cudd_Quit( dd );
+            return -1;
+        }
+        // Property is the third PO
+        pbOutputs = ABC_ALLOC( DdNode *, 1);
+        pbOutputs[0] = Aig_ObjGlobalBdd(Vec_PtrEntry(p->vCos, 2)); Cudd_Ref(pbOutputs[0]);
 
-    // create partitions
-    pbParts = Aig_ManCreatePartitions( dd, p, pPars->fReorder, pPars->fVerbose );
+        // Transition relation is the second PO
+        pbParts = ABC_ALLOC( DdNode *, 1);
+        pbParts[0] = Aig_ObjGlobalBdd(Vec_PtrEntry(p->vCos, 1)); Cudd_Ref(pbParts[0]);
 
-    // create the initial state and the variable map
-    bInitial  = Aig_ManInitStateVarMap( dd, p, pPars->fVerbose );  Cudd_Ref( bInitial );
+        // Initial state is the first PO
+        { // Modified from Aig_ManInitStateVarMap @ bbrReach.c:124
+            DdNode ** pbVarsX, ** pbVarsY;
+            int i;
+            
+            // set the variable mapping for Cudd_bddVarMap()
+            pbVarsX = ABC_ALLOC(DdNode *, dd->size / 2);
+            pbVarsY = ABC_ALLOC(DdNode *, dd->size / 2);
+            for ( i = 0; i < Saig_ManPiNum(p) / 2 ; i++ )
+            {
+                pbVarsX[i] = dd->vars[i];
+                pbVarsY[i] = dd->vars[Saig_ManPiNum(p) / 2 + i];
+            }
+            Cudd_SetVarMap(dd, pbVarsX, pbVarsY, Saig_ManPiNum(p) / 2);
+            ABC_FREE(pbVarsX);
+            ABC_FREE(pbVarsY);
+        }
+        bInitial = Aig_ObjGlobalBdd(Vec_PtrEntry(p->vCos, 0)); Cudd_Ref(bInitial);
+    } else {
+        // save outputs
+        pbOutputs = Aig_ManCreateOutputs( dd, p );
+
+        // create partitions
+        // Transition Relation is the conjunction of pbParts
+        pbParts = Aig_ManCreatePartitions( dd, p, pPars->fReorder, pPars->fVerbose );
+
+        // create the initial state and the variable map
+        bInitial = Aig_ManInitStateVarMap( dd, p, pPars->fVerbose );  Cudd_Ref( bInitial );
+    }
 
     // set reordering
     if ( pPars->fReorderImage )
         Cudd_AutodynEnable( dd, CUDD_REORDER_SYMM_SIFT );
 
     // check the result
-    RetValue = -1;
-    for ( i = 0; i < Saig_ManPoNum(p); i++ )
-    {
-        if ( fCheckOutputs && !Cudd_bddLeq( dd, bInitial, Cudd_Not(pbOutputs[i]) ) )
+    if ( pPars->fTransRel) {
+        RetValue = -1;
+        i = 2; // Property is the third PO
+        if ( fCheckOutputs && !Cudd_bddLeq( dd, bInitial, Cudd_Not(pbOutputs[0]) ) )
         {
             DdNode * bIntersect;
-            bIntersect = Cudd_bddIntersect( dd, bInitial, pbOutputs[i] );  Cudd_Ref( bIntersect );
+            bIntersect = Cudd_bddIntersect( dd, bInitial, pbOutputs[0] );  Cudd_Ref( bIntersect );
             assert( p->pSeqModel == NULL );
-            p->pSeqModel = Aig_ManVerifyUsingBddsCountExample( p, dd, pbParts, 
-                vOnionRings, bIntersect, i, pPars->fVerbose, pPars->fSilent ); 
+            if (pPars->fTransRel) {
+                Abc_Print(1, "Counter-example derivation is not implemented for transition relation.\n");
+            } else {
+                p->pSeqModel = Aig_ManVerifyUsingBddsCountExample( p, dd, pbParts, 
+                    vOnionRings, bIntersect, i, pPars->fVerbose, pPars->fSilent );
+            }
             Cudd_RecursiveDeref( dd, bIntersect );
             if ( !pPars->fSilent )
                 Abc_Print( 1, "Output %d of miter \"%s\" was asserted in frame %d. ", i, p->pName, -1 );
             RetValue = 0;
-            break;
+        }
+    } else {
+        RetValue = -1;
+        for ( i = 0; i < Saig_ManPoNum(p); i++ )
+        {
+            if ( fCheckOutputs && !Cudd_bddLeq( dd, bInitial, Cudd_Not(pbOutputs[i]) ) )
+            {
+                DdNode * bIntersect;
+                bIntersect = Cudd_bddIntersect( dd, bInitial, pbOutputs[i] );  Cudd_Ref( bIntersect );
+                assert( p->pSeqModel == NULL );
+                if (pPars->fTransRel) {
+                    Abc_Print(1, "Counter-example derivation is not implemented for transition relation.\n");
+                } else {
+                    p->pSeqModel = Aig_ManVerifyUsingBddsCountExample( p, dd, pbParts, 
+                        vOnionRings, bIntersect, i, pPars->fVerbose, pPars->fSilent );
+                }
+                Cudd_RecursiveDeref( dd, bIntersect );
+                if ( !pPars->fSilent )
+                    Abc_Print( 1, "Output %d of miter \"%s\" was asserted in frame %d. ", i, p->pName, -1 );
+                RetValue = 0;
+                break;
+            }
         }
     }
     // free the onion rings
@@ -509,13 +625,21 @@ int Aig_ManVerifyUsingBdds_int( Aig_Man_t * p, Saig_ParBbr_t * pPars )
         RetValue = Aig_ManComputeReachable( dd, p, pbParts, bInitial, pbOutputs, pPars, fCheckOutputs ); 
 
     // cleanup
-    Cudd_RecursiveDeref( dd, bInitial );
-    for ( i = 0; i < Saig_ManRegNum(p); i++ )
-        Cudd_RecursiveDeref( dd, pbParts[i] );
-    ABC_FREE( pbParts );
-    for ( i = 0; i < Saig_ManPoNum(p); i++ )
-        Cudd_RecursiveDeref( dd, pbOutputs[i] );
-    ABC_FREE( pbOutputs );
+    if ( pPars->fTransRel ) {
+        Cudd_RecursiveDeref( dd, bInitial );
+        Cudd_RecursiveDeref( dd, pbParts[0] );
+        Cudd_RecursiveDeref( dd, pbOutputs[0] );
+        ABC_FREE( pbParts );
+        ABC_FREE( pbOutputs );
+    } else {
+        Cudd_RecursiveDeref( dd, bInitial );
+        for ( i = 0; i < Saig_ManRegNum(p); i++ )
+            Cudd_RecursiveDeref( dd, pbParts[i] );
+        ABC_FREE( pbParts );
+        for ( i = 0; i < Saig_ManPoNum(p); i++ )
+            Cudd_RecursiveDeref( dd, pbOutputs[i] );
+        ABC_FREE( pbOutputs );
+    }
 //    if ( RetValue == -1 )
         Cudd_Quit( dd );
 //    else
@@ -556,15 +680,27 @@ int Aig_ManVerifyUsingBdds( Aig_Man_t * pInit, Saig_ParBbr_t * pPars )
     if ( i == Saig_ManPiNum(pInit) )
         return Aig_ManVerifyUsingBdds_int( pInit, pPars );
     // create new AIG
-    p = Aig_ManDupTrim( pInit );
-    assert( Aig_ManCiNum(p) < Aig_ManCiNum(pInit) );
-    assert( Aig_ManRegNum(p) == Aig_ManRegNum(pInit) );
+    if ( pPars->fTransRel ) {
+        p = pInit;
+    } else {
+        p = Aig_ManDupTrim( pInit );
+        assert( Aig_ManCiNum(p) < Aig_ManCiNum(pInit) );
+        assert( Aig_ManRegNum(p) == Aig_ManRegNum(pInit) );
+    }
     RetValue = Aig_ManVerifyUsingBdds_int( p, pPars );
     if ( RetValue != 0 )
     {
-        Aig_ManStop( p );
+        if ( !pPars->fTransRel) {
+            Aig_ManStop( p );
+        }
         return RetValue;
     }
+    if ( pPars->fTransRel ) {
+        if ( !pPars->fTransRel) {
+            Aig_ManStop( p );
+        }
+        return RetValue;
+    } 
     // the problem is satisfiable - remap the pattern
     pCexOld = p->pSeqModel;
     assert( pCexOld != NULL );
@@ -602,7 +738,9 @@ int Aig_ManVerifyUsingBdds( Aig_Man_t * pInit, Saig_ParBbr_t * pPars )
     assert( iBitNew == pCexNew->nBits );
     Vec_IntFree( vInputMap );
     pInit->pSeqModel = pCexNew;
-    Aig_ManStop( p );
+    if ( !pPars->fTransRel) {
+        Aig_ManStop( p );
+    }
     return 0;
 }
 

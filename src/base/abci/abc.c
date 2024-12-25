@@ -12784,7 +12784,7 @@ int Abc_CommandReach( Abc_Frame_t * pAbc, int argc, char ** argv )
     // set defaults
     Bbr_ManSetDefaultParams( pPars );
     Extra_UtilGetoptReset();
-    while ( ( c = Extra_UtilGetopt( argc, argv, "TBFLproyvh" ) ) != EOF )
+    while ( ( c = Extra_UtilGetopt( argc, argv, "TBFLproytvh" ) ) != EOF )
     {
         switch ( c )
         {
@@ -12842,6 +12842,9 @@ int Abc_CommandReach( Abc_Frame_t * pAbc, int argc, char ** argv )
         case 'y':
             pPars->fSkipOutCheck ^= 1;
             break;
+        case 't':
+            pPars->fTransRel ^= 1;
+            break;
         case 'v':
             pPars->fVerbose ^= 1;
             break;
@@ -12856,9 +12859,14 @@ int Abc_CommandReach( Abc_Frame_t * pAbc, int argc, char ** argv )
         Abc_Print( -1, "Empty network.\n" );
         return 1;
     }
-    if ( Abc_NtkLatchNum(pNtk) == 0 )
+    if ( Abc_NtkLatchNum(pNtk) == 0 && !pPars->fTransRel)
     {
         Abc_Print( -1, "The current network has no latches.\n" );
+        return 0;
+    }
+    if ( Abc_NtkLatchNum(pNtk) != 0 && pPars->fTransRel)
+    {
+        Abc_Print( -1, "The current network has latches.\n" );
         return 0;
     }
     if ( !Abc_NtkIsStrash(pNtk) )
@@ -12889,6 +12897,7 @@ usage:
     Abc_Print( -2, "\t-r     : enable dynamic BDD variable reordering [default = %s]\n", pPars->fReorder? "yes": "no" );
     Abc_Print( -2, "\t-o     : toggles BDD variable reordering during image computation [default = %s]\n", pPars->fReorderImage? "yes": "no" );
     Abc_Print( -2, "\t-y     : skip checking property outputs [default = %s]\n", pPars->fSkipOutCheck? "yes": "no" );
+    Abc_Print( -2, "\t-t     : treat input as transition relation [default = %s]\n", pPars->fTransRel? "yes": "no" );
     Abc_Print( -2, "\t-v     : prints verbose information [default = %s]\n", pPars->fVerbose? "yes": "no" );
     Abc_Print( -2, "\t-h     : print the command usage\n");
     return 1;

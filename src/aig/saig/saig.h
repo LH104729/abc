@@ -59,6 +59,7 @@ struct Saig_ParBbr_t_
     int         fPartition;
     int         fReorder;
     int         fReorderImage;
+    int         fTransRel;
     int         fVerbose;
     int         fSilent;
     int         fSkipOutCheck;// skip output checking

@@ -46,7 +46,7 @@ extern DdNode * Bbr_bddComputeRangeCube( DdManager * dd, int iStart, int iStop )
 ***********************************************************************/
 Abc_Cex_t * Aig_ManVerifyUsingBddsCountExample( Aig_Man_t * p, DdManager * dd, 
     DdNode ** pbParts, Vec_Ptr_t * vOnionRings, DdNode * bCubeFirst,
-    int iOutput, int fVerbose, int fSilent )
+    int iOutput, int fVerbose, int fSilent)
 {
     Abc_Cex_t * pCex;
     Aig_Obj_t * pObj;
