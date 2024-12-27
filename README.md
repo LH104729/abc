@@ -4,7 +4,11 @@
 
 ### `reach` with combinatorial transition relation
 
-Given a transition system $I(x), T(x, x')$, where $|x|= |x'| = n$, and a property $P(x)$, the circuit with inputs $x, x'$ and outputs $(I, T, ~P)$ can be used with `reach -t` to check if the property $P$ will not be violated.
+Given a transition system $I(x), T(x, x')$, where $|x|= |x'| = n$, and a property $P(x)$, the circuit with inputs $x, x'$ and outputs $(I, T, ~P)$ can be used with `reach -t` to check if the property $P$ will not be violated. Counter-example generation is not implemented.
+
+### `reach` with dump
+
+The flag `-d` enables dumping the reachable state BDD as a .blif file on unreachable instances.
 
 ---
 
