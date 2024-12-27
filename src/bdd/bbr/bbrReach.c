@@ -425,6 +425,15 @@ int Aig_ManComputeReachable( DdManager * dd, Aig_Man_t * p, DdNode ** pbParts, D
 
     }
     Cudd_RecursiveDeref( dd, bNext );
+
+    if (pPars->fDump) {
+        // Dump the BDD as blif
+        char * pFileName = "reachable_states.blif";
+        FILE * pFile = fopen( pFileName, "wb" );
+        Cudd_DumpBlif( dd, 1, &bReached, NULL, NULL, NULL, pFile, 1 );
+        fclose( pFile );
+    }
+
     // free the onion rings
     Vec_PtrForEachEntry( DdNode *, vOnionRings, bTemp, i )
         Cudd_RecursiveDeref( dd, bTemp );

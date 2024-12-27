@@ -12784,7 +12784,7 @@ int Abc_CommandReach( Abc_Frame_t * pAbc, int argc, char ** argv )
     // set defaults
     Bbr_ManSetDefaultParams( pPars );
     Extra_UtilGetoptReset();
-    while ( ( c = Extra_UtilGetopt( argc, argv, "TBFLproytvh" ) ) != EOF )
+    while ( ( c = Extra_UtilGetopt( argc, argv, "TBFLproytvdh" ) ) != EOF )
     {
         switch ( c )
         {
@@ -12848,6 +12848,9 @@ int Abc_CommandReach( Abc_Frame_t * pAbc, int argc, char ** argv )
         case 'v':
             pPars->fVerbose ^= 1;
             break;
+        case 'd':
+            pPars->fDump ^= 1;
+            break;
         case 'h':
             goto usage;
         default:
@@ -12898,6 +12901,7 @@ usage:
     Abc_Print( -2, "\t-o     : toggles BDD variable reordering during image computation [default = %s]\n", pPars->fReorderImage? "yes": "no" );
     Abc_Print( -2, "\t-y     : skip checking property outputs [default = %s]\n", pPars->fSkipOutCheck? "yes": "no" );
     Abc_Print( -2, "\t-t     : treat input as transition relation [default = %s]\n", pPars->fTransRel? "yes": "no" );
+    Abc_Print( -2, "\t-d     : dump the reachable states as blif [default = %s]\n", pPars->fTransRel? "yes": "no" );
     Abc_Print( -2, "\t-v     : prints verbose information [default = %s]\n", pPars->fVerbose? "yes": "no" );
     Abc_Print( -2, "\t-h     : print the command usage\n");
     return 1;
