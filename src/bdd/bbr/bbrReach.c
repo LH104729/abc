@@ -19,6 +19,8 @@
 ***********************************************************************/
 
 #include "bbr.h"
+#include "bdd/cudd/cudd.h"
+#include "bdd/dddmp/dddmp.h"
 
 ABC_NAMESPACE_IMPL_START
 
@@ -414,6 +416,7 @@ int Aig_ManComputeReachable( DdManager * dd, Aig_Man_t * p, DdNode ** pbParts, D
             double nMints;
             if ( pPars->fTransRel) {
                 nMints = Cudd_CountMinterm(dd, bReached, Saig_ManPiNum(p) / 2 );
+    //            Extra_bddPrint( dd, bReached );printf( "\n" );
                 fprintf( stdout, "Reachable states = %.0f. (Ratio = %.4f %%)\n", nMints, 100.0*nMints/pow(2.0, Saig_ManPiNum(p) / 2) );
             } else {
                 nMints = Cudd_CountMinterm(dd, bReached, Saig_ManRegNum(p) );
@@ -428,10 +431,8 @@ int Aig_ManComputeReachable( DdManager * dd, Aig_Man_t * p, DdNode ** pbParts, D
 
     if (pPars->fDump) {
         // Dump the BDD as blif
-        char * pFileName = "reachable_states.blif";
-        FILE * pFile = fopen( pFileName, "wb" );
-        Cudd_DumpBlif( dd, 1, &bReached, NULL, NULL, NULL, pFile, 1 );
-        fclose( pFile );
+        char * pFileName = "reachable_states.dddmp";
+        Dddmp_cuddBddStore( dd, "reachable", bReached, NULL, NULL, DDDMP_MODE_TEXT, DDDMP_VARIDS, pFileName, NULL );
     }
 
     // free the onion rings
