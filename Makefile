@@ -72,7 +72,7 @@ endif
 # compile CUDD with ABC
 ifndef ABC_USE_NO_CUDD
   CFLAGS += -DABC_USE_CUDD=1
-  MODULES += src/bdd/cudd src/bdd/extrab src/bdd/dsd src/bdd/epd src/bdd/mtr src/bdd/reo src/bdd/cas src/bdd/bbr src/bdd/llb
+  MODULES += src/bdd/cudd src/bdd/extrab src/bdd/dsd src/bdd/epd src/bdd/mtr src/bdd/reo src/bdd/cas src/bdd/bbr src/bdd/llb src/bdd/dddmp
   $(info $(MSG_PREFIX)Compiling with CUDD)
 endif
 
