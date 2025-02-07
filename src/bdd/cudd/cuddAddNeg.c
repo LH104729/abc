@@ -1,25 +1,14 @@
-/**CFile***********************************************************************
+/**
+  @file
 
-  FileName    [cuddAddNeg.c]
+  @ingroup cudd
 
-  PackageName [cudd]
+  @brief Function to compute the negation of an %ADD.
 
-  Synopsis    [Function to compute the negation of an ADD.]
+  @author Fabio Somenzi, Balakrishna Kumthekar
 
-  Description [External procedures included in this module:
-                <ul>
-                <li> Cudd_addNegate()
-                <li> Cudd_addRoundOff()
-                </ul>
-        Internal procedures included in this module:
-                <ul>
-                <li> cuddAddNegateRecur()
-                <li> cuddAddRoundOffRecur()
-                </ul> ]
-
-  Author      [Fabio Somenzi, Balakrishna Kumthekar]
-
-  Copyright   [Copyright (c) 1995-2004, Regents of the University of Colorado
+  @copyright@parblock
+  Copyright (c) 1995-2015, Regents of the University of Colorado
 
   All rights reserved.
 
@@ -49,18 +38,15 @@
   CAUSED AND ON ANY THEORY OF LIABILITY, WHETHER IN CONTRACT, STRICT
   LIABILITY, OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN
   ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE
-  POSSIBILITY OF SUCH DAMAGE.]
+  POSSIBILITY OF SUCH DAMAGE.
+  @endparblock
 
-******************************************************************************/
+*/
 
 #include "misc/util/util_hack.h"
 #include "cuddInt.h"
 
 ABC_NAMESPACE_IMPL_START
-
-
-
-
 /*---------------------------------------------------------------------------*/
 /* Constant declarations                                                     */
 /*---------------------------------------------------------------------------*/
@@ -80,42 +66,34 @@ ABC_NAMESPACE_IMPL_START
 /* Variable declarations                                                     */
 /*---------------------------------------------------------------------------*/
 
-#ifndef lint
-static char rcsid[] DD_UNUSED = "$Id: cuddAddNeg.c,v 1.12 2009/02/20 02:14:58 fabio Exp $";
-#endif
-
 
 /*---------------------------------------------------------------------------*/
 /* Macro declarations                                                        */
 /*---------------------------------------------------------------------------*/
 
-
-/**AutomaticStart*************************************************************/
+/** \cond */
 
 /*---------------------------------------------------------------------------*/
 /* Static function prototypes                                                */
 /*---------------------------------------------------------------------------*/
 
-
-/**AutomaticEnd***************************************************************/
+/** \endcond */
 
 
 /*---------------------------------------------------------------------------*/
 /* Definition of exported functions                                          */
 /*---------------------------------------------------------------------------*/
 
-/**Function********************************************************************
+/**
+  @brief Computes the additive inverse of an %ADD.
 
-  Synopsis    [Computes the additive inverse of an ADD.]
+  @return a pointer to the result if successful; NULL otherwise.
 
-  Description [Computes the additive inverse of an ADD. Returns a pointer
-  to the result if successful; NULL otherwise.]
+  @sideeffect None
 
-  SideEffects [None]
+  @see Cudd_addCmpl
 
-  SeeAlso     [Cudd_addCmpl]
-
-******************************************************************************/
+*/
 DdNode *
 Cudd_addNegate(
   DdManager * dd,
@@ -124,26 +102,28 @@ Cudd_addNegate(
     DdNode *res;
 
     do {
-        res = cuddAddNegateRecur(dd,f);
+	dd->reordered = 0;
+	res = cuddAddNegateRecur(dd,f);
     } while (dd->reordered == 1);
+    if (dd->errorCode == CUDD_TIMEOUT_EXPIRED && dd->timeoutHandler) {
+        dd->timeoutHandler(dd, dd->tohArg);
+    }
     return(res);
 
 } /* end of Cudd_addNegate */
 
 
-/**Function********************************************************************
+/**
+  @brief Rounds off the discriminants of an %ADD.
 
-  Synopsis    [Rounds off the discriminants of an ADD.]
+  @details The discriminants are rounded off to N digits after the
+  decimal.
 
-  Description [Rounds off the discriminants of an ADD. The discriminants are
-  rounded off to N digits after the decimal. Returns a pointer to the result
-  ADD if successful; NULL otherwise.]
+  @return a pointer to the result %ADD if successful; NULL otherwise.
 
-  SideEffects [None]
+  @sideeffect None
 
-  SeeAlso     []
-
-******************************************************************************/
+*/
 DdNode *
 Cudd_addRoundOff(
   DdManager * dd,
@@ -154,8 +134,12 @@ Cudd_addRoundOff(
     double trunc = pow(10.0,(double)N);
 
     do {
-        res = cuddAddRoundOffRecur(dd,f,trunc);
+	dd->reordered = 0;
+	res = cuddAddRoundOffRecur(dd,f,trunc);
     } while (dd->reordered == 1);
+    if (dd->errorCode == CUDD_TIMEOUT_EXPIRED && dd->timeoutHandler) {
+        dd->timeoutHandler(dd, dd->tohArg);
+    }
     return(res);
 
 } /* end of Cudd_addRoundOff */
@@ -166,35 +150,35 @@ Cudd_addRoundOff(
 /*---------------------------------------------------------------------------*/
 
 
-/**Function********************************************************************
+/**
+  @brief Implements the recursive step of Cudd_addNegate.
 
-  Synopsis    [Implements the recursive step of Cudd_addNegate.]
+  @return a pointer to the result.
 
-  Description [Implements the recursive step of Cudd_addNegate.
-  Returns a pointer to the result.]
+  @sideeffect None
 
-  SideEffects [None]
-
-******************************************************************************/
+*/
 DdNode *
 cuddAddNegateRecur(
   DdManager * dd,
   DdNode * f)
 {
     DdNode *res,
-            *fv, *fvn,
-            *T, *E;
+	    *fv, *fvn,
+	    *T, *E;
 
     statLine(dd);
     /* Check terminal cases. */
     if (cuddIsConstant(f)) {
-        res = cuddUniqueConst(dd,-cuddV(f));
-        return(res);
+	res = cuddUniqueConst(dd,-cuddV(f));
+	return(res);
     }
 
     /* Check cache */
     res = cuddCacheLookup1(dd,Cudd_addNegate,f);
     if (res != NULL) return(res);
+
+    checkWhetherToGiveUp(dd);
 
     /* Recursive Step */
     fv = cuddT(f);
@@ -205,15 +189,15 @@ cuddAddNegateRecur(
 
     E = cuddAddNegateRecur(dd,fvn);
     if (E == NULL) {
-        Cudd_RecursiveDeref(dd,T);
-        return(NULL);
+	Cudd_RecursiveDeref(dd,T);
+	return(NULL);
     }
     cuddRef(E);
     res = (T == E) ? T : cuddUniqueInter(dd,(int)f->index,T,E);
     if (res == NULL) {
-        Cudd_RecursiveDeref(dd, T);
-        Cudd_RecursiveDeref(dd, E);
-        return(NULL);
+	Cudd_RecursiveDeref(dd, T);
+	Cudd_RecursiveDeref(dd, E);
+	return(NULL);
     }
     cuddDeref(T);
     cuddDeref(E);
@@ -226,32 +210,14 @@ cuddAddNegateRecur(
 } /* end of cuddAddNegateRecur */
 
 
-#ifdef USE_CASH_DUMMY
-/**Function********************************************************************
+/**
+  @brief Implements the recursive step of Cudd_addRoundOff.
 
-  Synopsis    We need to declare a function passed to cuddCacheLookup1 that can
-              be casted to DD_CTFP.
+  @return a pointer to the result.
 
-******************************************************************************/
-static DdNode *
-Cudd_addRoundOff_dummy(DdManager * dd, DdNode * f) 
-{
-  assert(0);
-  return 0;
-}
-#endif
+  @sideeffect None
 
-
-/**Function********************************************************************
-
-  Synopsis    [Implements the recursive step of Cudd_addRoundOff.]
-
-  Description [Implements the recursive step of Cudd_addRoundOff.
-  Returns a pointer to the result.]
-
-  SideEffects [None]
-
-******************************************************************************/
+*/
 DdNode *
 cuddAddRoundOffRecur(
   DdManager * dd,
@@ -265,19 +231,16 @@ cuddAddRoundOffRecur(
 
     statLine(dd);
     if (cuddIsConstant(f)) {
-        n = ceil(cuddV(f)*trunc)/trunc;
-        res = cuddUniqueConst(dd,n);
-        return(res);
+	n = ceil(cuddV(f)*trunc)/trunc;
+	res = cuddUniqueConst(dd,n);
+	return(res);
     }
-#ifdef USE_CASH_DUMMY
-    cacheOp = (DD_CTFP1) Cudd_addRoundOff_dummy;
-#else
     cacheOp = (DD_CTFP1) Cudd_addRoundOff;
-#endif
     res = cuddCacheLookup1(dd,cacheOp,f);
     if (res != NULL) {
-        return(res);
+	return(res);
     }
+    checkWhetherToGiveUp(dd);
     /* Recursive Step */
     fv = cuddT(f);
     fvn = cuddE(f);
@@ -288,15 +251,15 @@ cuddAddRoundOffRecur(
     cuddRef(T);
     E = cuddAddRoundOffRecur(dd,fvn,trunc);
     if (E == NULL) {
-        Cudd_RecursiveDeref(dd,T);
-        return(NULL);
+	Cudd_RecursiveDeref(dd,T);
+	return(NULL);
     }
     cuddRef(E);
     res = (T == E) ? T : cuddUniqueInter(dd,(int)f->index,T,E);
     if (res == NULL) {
-        Cudd_RecursiveDeref(dd,T);
-        Cudd_RecursiveDeref(dd,E);
-        return(NULL);
+	Cudd_RecursiveDeref(dd,T);
+	Cudd_RecursiveDeref(dd,E);
+	return(NULL);
     }
     cuddDeref(T);
     cuddDeref(E);
@@ -310,7 +273,4 @@ cuddAddRoundOffRecur(
 /*---------------------------------------------------------------------------*/
 /* Definition of static functions                                            */
 /*---------------------------------------------------------------------------*/
-
-
 ABC_NAMESPACE_IMPL_END
-

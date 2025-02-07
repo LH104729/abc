@@ -2503,7 +2503,7 @@ DdNode* Extra_zddRandomSet(
     Cudd_Ref( Result );
 
     /* seed random number generator */
-    Cudd_Srandom( time(NULL) );
+    Cudd_Srandom( dd, time(NULL) );
 //  Cudd_Srandom( 4 );
     /* determine the limit below which var belongs to the combination */
     Limit = (int)(d * 2147483561.0);
@@ -2512,7 +2512,7 @@ DdNode* Extra_zddRandomSet(
     for ( c = 0; c < k; c++ )
     {
         for ( v = 0; v < n; v++ )
-            if ( Cudd_Random() <= Limit )
+            if ( Cudd_Random(dd) <= Limit )
                 VarValues[v] = 1;
             else
                 VarValues[v] = 0;

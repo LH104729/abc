@@ -1,24 +1,14 @@
-/**CFile***********************************************************************
+/**
+  @file
 
-  FileName    [cuddLiteral.c]
+  @ingroup cudd
 
-  PackageName [cudd]
+  @brief Functions for manipulation of literal sets represented by BDDs.
 
-  Synopsis    [Functions for manipulation of literal sets represented by
-  BDDs.]
+  @author Fabio Somenzi
 
-  Description [External procedures included in this file:
-                <ul>
-                <li> Cudd_bddLiteralSetIntersection()
-                </ul>
-            Internal procedures included in this file:
-                <ul>
-                <li> cuddBddLiteralSetIntersectionRecur()
-                </ul>]
-
-  Author      [Fabio Somenzi]
-
-  Copyright   [Copyright (c) 1995-2004, Regents of the University of Colorado
+  @copyright@parblock
+  Copyright (c) 1995-2015, Regents of the University of Colorado
 
   All rights reserved.
 
@@ -48,17 +38,15 @@
   CAUSED AND ON ANY THEORY OF LIABILITY, WHETHER IN CONTRACT, STRICT
   LIABILITY, OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN
   ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE
-  POSSIBILITY OF SUCH DAMAGE.]
+  POSSIBILITY OF SUCH DAMAGE.
+  @endparblock
 
-******************************************************************************/
+*/
 
 #include "misc/util/util_hack.h"
 #include "cuddInt.h"
 
 ABC_NAMESPACE_IMPL_START
-
-
-
 
 /*---------------------------------------------------------------------------*/
 /* Constant declarations                                                     */
@@ -76,22 +64,18 @@ ABC_NAMESPACE_IMPL_START
 /* Variable declarations                                                     */
 /*---------------------------------------------------------------------------*/
 
-#ifndef lint
-static char rcsid[] DD_UNUSED = "$Id: cuddLiteral.c,v 1.8 2004/08/13 18:04:50 fabio Exp $";
-#endif
 
 /*---------------------------------------------------------------------------*/
 /* Macro declarations                                                        */
 /*---------------------------------------------------------------------------*/
 
-/**AutomaticStart*************************************************************/
+/** \cond */
 
 /*---------------------------------------------------------------------------*/
 /* Static function prototypes                                                */
 /*---------------------------------------------------------------------------*/
 
-
-/**AutomaticEnd***************************************************************/
+/** \endcond */
 
 
 /*---------------------------------------------------------------------------*/
@@ -99,21 +83,20 @@ static char rcsid[] DD_UNUSED = "$Id: cuddLiteral.c,v 1.8 2004/08/13 18:04:50 fa
 /*---------------------------------------------------------------------------*/
 
 
-/**Function********************************************************************
+/**
+  @brief Computes the intesection of two sets of literals
+  represented as BDDs.
 
-  Synopsis    [Computes the intesection of two sets of literals
-  represented as BDDs.]
+  @details Each set is represented as a cube of the literals in the
+  set. The empty set is represented by the constant 1.  No variable
+  can be simultaneously present in both phases in a set.
 
-  Description [Computes the intesection of two sets of literals
-  represented as BDDs. Each set is represented as a cube of the
-  literals in the set. The empty set is represented by the constant 1.
-  No variable can be simultaneously present in both phases in a set.
-  Returns a pointer to the BDD representing the intersected sets, if
-  successful; NULL otherwise.]
+  @return a pointer to the %BDD representing the intersected sets, if
+  successful; NULL otherwise.
 
-  SideEffects [None]
+  @sideeffect None
 
-******************************************************************************/
+*/
 DdNode *
 Cudd_bddLiteralSetIntersection(
   DdManager * dd,
@@ -123,9 +106,12 @@ Cudd_bddLiteralSetIntersection(
     DdNode *res;
 
     do {
-        dd->reordered = 0;
-        res = cuddBddLiteralSetIntersectionRecur(dd,f,g);
+	dd->reordered = 0;
+	res = cuddBddLiteralSetIntersectionRecur(dd,f,g);
     } while (dd->reordered == 1);
+    if (dd->errorCode == CUDD_TIMEOUT_EXPIRED && dd->timeoutHandler) {
+        dd->timeoutHandler(dd, dd->tohArg);
+    }
     return(res);
 
 } /* end of Cudd_bddLiteralSetIntersection */
@@ -136,19 +122,19 @@ Cudd_bddLiteralSetIntersection(
 /*---------------------------------------------------------------------------*/
 
 
-/**Function********************************************************************
+/**
+  @brief Performs the recursive step of
+  Cudd_bddLiteralSetIntersection.
 
-  Synopsis    [Performs the recursive step of
-  Cudd_bddLiteralSetIntersection.]
+  @details Scans the cubes for common variables, and checks whether
+  they agree in phase.
 
-  Description [Performs the recursive step of
-  Cudd_bddLiteralSetIntersection. Scans the cubes for common variables,
-  and checks whether they agree in phase.  Returns a pointer to the
-  resulting cube if successful; NULL otherwise.]
+  @return a pointer to the resulting cube if successful; NULL
+  otherwise.
 
-  SideEffects [None]
+  @sideeffect None
 
-******************************************************************************/
+*/
 DdNode *
 cuddBddLiteralSetIntersectionRecur(
   DdManager * dd,
@@ -160,7 +146,7 @@ cuddBddLiteralSetIntersectionRecur(
     DdNode *fc, *gc;
     DdNode *one;
     DdNode *zero;
-    unsigned int topf, topg, comple;
+    int topf, topg, comple;
     int phasef, phaseg;
 
     statLine(dd);
@@ -183,27 +169,27 @@ cuddBddLiteralSetIntersectionRecur(
     ** loop will stop when the constant node is reached in both cubes.
     */
     while (topf != topg) {
-        if (topf < topg) {      /* move down on f */
-            comple = f != F;
-            f = cuddT(F);
-            if (comple) f = Cudd_Not(f);
-            if (f == zero) {
-                f = cuddE(F);
-                if (comple) f = Cudd_Not(f);
-            }
-            F = Cudd_Regular(f);
-            topf = cuddI(dd,F->index);
-        } else if (topg < topf) {
-            comple = g != G;
-            g = cuddT(G);
-            if (comple) g = Cudd_Not(g);
-            if (g == zero) {
-                g = cuddE(G);
-                if (comple) g = Cudd_Not(g);
-            }
-            G = Cudd_Regular(g);
-            topg = cuddI(dd,G->index);
-        }
+	if (topf < topg) {	/* move down on f */
+	    comple = f != F;
+	    f = cuddT(F);
+	    if (comple) f = Cudd_Not(f);
+	    if (f == zero) {
+		f = cuddE(F);
+		if (comple) f = Cudd_Not(f);
+	    }
+	    F = Cudd_Regular(f);
+	    topf = cuddI(dd,F->index);
+	} else if (topg < topf) {
+	    comple = g != G;
+	    g = cuddT(G);
+	    if (comple) g = Cudd_Not(g);
+	    if (g == zero) {
+		g = cuddE(G);
+		if (comple) g = Cudd_Not(g);
+	    }
+	    G = Cudd_Regular(g);
+	    topg = cuddI(dd,G->index);
+	}
     }
 
     /* At this point, f == one <=> g == 1. It suffices to test one of them. */
@@ -211,8 +197,10 @@ cuddBddLiteralSetIntersectionRecur(
 
     res = cuddCacheLookup2(dd,Cudd_bddLiteralSetIntersection,f,g);
     if (res != NULL) {
-        return(res);
+	return(res);
     }
+
+    checkWhetherToGiveUp(dd);
 
     /* Here f and g are both non constant and have the same top variable. */
     comple = f != F;
@@ -220,39 +208,39 @@ cuddBddLiteralSetIntersectionRecur(
     phasef = 1;
     if (comple) fc = Cudd_Not(fc);
     if (fc == zero) {
-        fc = cuddE(F);
-        phasef = 0;
-        if (comple) fc = Cudd_Not(fc);
+	fc = cuddE(F);
+	phasef = 0;
+	if (comple) fc = Cudd_Not(fc);
     }
     comple = g != G;
     gc = cuddT(G);
     phaseg = 1;
     if (comple) gc = Cudd_Not(gc);
     if (gc == zero) {
-        gc = cuddE(G);
-        phaseg = 0;
-        if (comple) gc = Cudd_Not(gc);
+	gc = cuddE(G);
+	phaseg = 0;
+	if (comple) gc = Cudd_Not(gc);
     }
 
     tmp = cuddBddLiteralSetIntersectionRecur(dd,fc,gc);
     if (tmp == NULL) {
-        return(NULL);
+	return(NULL);
     }
 
     if (phasef != phaseg) {
-        res = tmp;
+	res = tmp;
     } else {
-        cuddRef(tmp);
-        if (phasef == 0) {
-            res = cuddBddAndRecur(dd,Cudd_Not(dd->vars[F->index]),tmp);
-        } else {
-            res = cuddBddAndRecur(dd,dd->vars[F->index],tmp);
-        }
-        if (res == NULL) {
-            Cudd_RecursiveDeref(dd,tmp);
-            return(NULL);
-        }
-        cuddDeref(tmp); /* Just cuddDeref, because it is included in result */
+	cuddRef(tmp);
+	if (phasef == 0) {
+	    res = cuddBddAndRecur(dd,Cudd_Not(dd->vars[F->index]),tmp);
+	} else {
+	    res = cuddBddAndRecur(dd,dd->vars[F->index],tmp);
+	}
+	if (res == NULL) {
+	    Cudd_RecursiveDeref(dd,tmp);
+	    return(NULL);
+	}
+	cuddDeref(tmp); /* Just cuddDeref, because it is included in result */
     }
 
     cuddCacheInsert2(dd,Cudd_bddLiteralSetIntersection,f,g,res);
@@ -266,7 +254,4 @@ cuddBddLiteralSetIntersectionRecur(
 /* Definition of static functions                                            */
 /*---------------------------------------------------------------------------*/
 
-
 ABC_NAMESPACE_IMPL_END
-
-

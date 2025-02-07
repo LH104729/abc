@@ -1,30 +1,14 @@
-/**CFile***********************************************************************
+/**
+  @file
 
-  FileName    [cuddWindow.c]
+  @ingroup cudd
 
-  PackageName [cudd]
+  @brief Functions for variable reordering by window permutation.
 
-  Synopsis    [Functions for variable reordering by window permutation.]
+  @author Fabio Somenzi
 
-  Description [Internal procedures included in this module:
-                <ul>
-                <li> cuddWindowReorder()
-                </ul>
-        Static procedures included in this module:
-                <ul>
-                <li> ddWindow2()
-                <li> ddWindowConv2()
-                <li> ddPermuteWindow3()
-                <li> ddWindow3()
-                <li> ddWindowConv3()
-                <li> ddPermuteWindow4()
-                <li> ddWindow4()
-                <li> ddWindowConv4()
-                </ul>]
-
-  Author      [Fabio Somenzi]
-
-  Copyright   [Copyright (c) 1995-2004, Regents of the University of Colorado
+  @copyright@parblock
+  Copyright (c) 1995-2015, Regents of the University of Colorado
 
   All rights reserved.
 
@@ -54,51 +38,36 @@
   CAUSED AND ON ANY THEORY OF LIABILITY, WHETHER IN CONTRACT, STRICT
   LIABILITY, OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN
   ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE
-  POSSIBILITY OF SUCH DAMAGE.]
+  POSSIBILITY OF SUCH DAMAGE.
+  @endparblock
 
-******************************************************************************/
+*/
 
 #include "misc/util/util_hack.h"
 #include "cuddInt.h"
 
 ABC_NAMESPACE_IMPL_START
-
-
-
 /*---------------------------------------------------------------------------*/
 /* Constant declarations                                                     */
 /*---------------------------------------------------------------------------*/
-
 
 /*---------------------------------------------------------------------------*/
 /* Stucture declarations                                                     */
 /*---------------------------------------------------------------------------*/
 
-
 /*---------------------------------------------------------------------------*/
 /* Type declarations                                                         */
 /*---------------------------------------------------------------------------*/
-
 
 /*---------------------------------------------------------------------------*/
 /* Variable declarations                                                     */
 /*---------------------------------------------------------------------------*/
 
-#ifndef lint
-static char rcsid[] DD_UNUSED = "$Id: cuddWindow.c,v 1.14 2009/02/20 02:14:58 fabio Exp $";
-#endif
-
-#ifdef DD_STATS
-extern  int     ddTotalNumberSwapping;
-extern  int     ddTotalNISwaps;
-#endif
-
 /*---------------------------------------------------------------------------*/
 /* Macro declarations                                                        */
 /*---------------------------------------------------------------------------*/
 
-
-/**AutomaticStart*************************************************************/
+/** \cond */
 
 /*---------------------------------------------------------------------------*/
 /* Static function prototypes                                                */
@@ -113,7 +82,7 @@ static int ddPermuteWindow4 (DdManager *table, int w);
 static int ddWindow4 (DdManager *table, int low, int high);
 static int ddWindowConv4 (DdManager *table, int low, int high);
 
-/**AutomaticEnd***************************************************************/
+/** \endcond */
 
 
 /*---------------------------------------------------------------------------*/
@@ -125,25 +94,24 @@ static int ddWindowConv4 (DdManager *table, int low, int high);
 /*---------------------------------------------------------------------------*/
 
 
-/**Function********************************************************************
+/**
+  @brief Reorders by applying the method of the sliding window.
 
-  Synopsis    [Reorders by applying the method of the sliding window.]
+  @details Tries all possible permutations to the variables in a
+  window that slides from low to high. The size of the window is
+  determined by submethod.  Assumes that no dead nodes are present.
 
-  Description [Reorders by applying the method of the sliding window.
-  Tries all possible permutations to the variables in a window that
-  slides from low to high. The size of the window is determined by
-  submethod.  Assumes that no dead nodes are present.  Returns 1 in
-  case of success; 0 otherwise.]
+  @return 1 in case of success; 0 otherwise.
 
-  SideEffects [None]
+  @sideeffect None
 
-******************************************************************************/
+*/
 int
 cuddWindowReorder(
-  DdManager * table /* DD table */,
-  int low /* lowest index to reorder */,
-  int high /* highest index to reorder */,
-  Cudd_ReorderingType submethod /* window reordering option */)
+  DdManager * table /**< %DD table */,
+  int low /**< lowest index to reorder */,
+  int high /**< highest index to reorder */,
+  Cudd_ReorderingType submethod /**< window reordering option */)
 {
 
     int res;
@@ -153,39 +121,39 @@ cuddWindowReorder(
 
     switch (submethod) {
     case CUDD_REORDER_WINDOW2:
-        res = ddWindow2(table,low,high);
-        break;
+	res = ddWindow2(table,low,high);
+	break;
     case CUDD_REORDER_WINDOW3:
-        res = ddWindow3(table,low,high);
-        break;
+	res = ddWindow3(table,low,high);
+	break;
     case CUDD_REORDER_WINDOW4:
-        res = ddWindow4(table,low,high);
-        break;
+	res = ddWindow4(table,low,high);
+	break;
     case CUDD_REORDER_WINDOW2_CONV:
-        res = ddWindowConv2(table,low,high);
-        break;
+	res = ddWindowConv2(table,low,high);
+	break;
     case CUDD_REORDER_WINDOW3_CONV:
-        res = ddWindowConv3(table,low,high);
+	res = ddWindowConv3(table,low,high);
 #ifdef DD_DEBUG
-        supposedOpt = table->keys - table->isolated;
-        res = ddWindow3(table,low,high);
-        if (table->keys - table->isolated != (unsigned) supposedOpt) {
-            (void) fprintf(table->err, "Convergence failed! (%d != %d)\n",
-                           table->keys - table->isolated, supposedOpt);
-        }
+	supposedOpt = (int) (table->keys - table->isolated);
+	res = ddWindow3(table,low,high);
+	if (table->keys - table->isolated != (unsigned) supposedOpt) {
+	    (void) fprintf(table->err, "Convergence failed! (%d != %d)\n",
+			   table->keys - table->isolated, supposedOpt);
+	}
 #endif
-        break;
+	break;
     case CUDD_REORDER_WINDOW4_CONV:
-        res = ddWindowConv4(table,low,high);
+	res = ddWindowConv4(table,low,high);
 #ifdef DD_DEBUG
-        supposedOpt = table->keys - table->isolated;
-        res = ddWindow4(table,low,high);
-        if (table->keys - table->isolated != (unsigned) supposedOpt) {
-            (void) fprintf(table->err,"Convergence failed! (%d != %d)\n",
-                           table->keys - table->isolated, supposedOpt);
-        }
+	supposedOpt = (int) (table->keys - table->isolated);
+	res = ddWindow4(table,low,high);
+	if (table->keys - table->isolated != (unsigned) supposedOpt) {
+	    (void) fprintf(table->err,"Convergence failed! (%d != %d)\n",
+			   table->keys - table->isolated, supposedOpt);
+	}
 #endif
-        break;
+	break;
     default: return(0);
     }
 
@@ -198,18 +166,17 @@ cuddWindowReorder(
 /* Definition of static functions                                            */
 /*---------------------------------------------------------------------------*/
 
-/**Function********************************************************************
+/**
+  @brief Reorders by applying a sliding window of width 2.
 
-  Synopsis    [Reorders by applying a sliding window of width 2.]
+  @details Tries both permutations of the variables in a window that
+  slides from low to high.  Assumes that no dead nodes are present.
 
-  Description [Reorders by applying a sliding window of width 2.
-  Tries both permutations of the variables in a window
-  that slides from low to high.  Assumes that no dead nodes are
-  present.  Returns 1 in case of success; 0 otherwise.]
+  @return 1 in case of success; 0 otherwise.
 
-  SideEffects [None]
+  @sideeffect None
 
-******************************************************************************/
+*/
 static int
 ddWindow2(
   DdManager * table,
@@ -227,22 +194,22 @@ ddWindow2(
 
     if (high-low < 1) return(0);
 
-    res = table->keys - table->isolated;
+    res = (int) (table->keys - table->isolated);
     for (x = low; x < high; x++) {
-        size = res;
-        res = cuddSwapInPlace(table,x,x+1);
-        if (res == 0) return(0);
-        if (res >= size) { /* no improvement: undo permutation */
-            res = cuddSwapInPlace(table,x,x+1);
-            if (res == 0) return(0);
-        }
+	size = res;
+	res = cuddSwapInPlace(table,x,x+1);
+	if (res == 0) return(0);
+	if (res >= size) { /* no improvement: undo permutation */
+	    res = cuddSwapInPlace(table,x,x+1);
+	    if (res == 0) return(0);
+	}
 #ifdef DD_STATS
-        if (res < size) {
-            (void) fprintf(table->out,"-");
-        } else {
-            (void) fprintf(table->out,"=");
-        }
-        fflush(table->out);
+	if (res < size) {
+	    (void) fprintf(table->out,"-");
+	} else {
+	    (void) fprintf(table->out,"=");
+	}
+	fflush(table->out);
 #endif
     }
 
@@ -251,19 +218,18 @@ ddWindow2(
 } /* end of ddWindow2 */
 
 
-/**Function********************************************************************
+/**
+  @brief Reorders by repeatedly applying a sliding window of width 2.
 
-  Synopsis    [Reorders by repeatedly applying a sliding window of width 2.]
+  @details Tries both permutations of the variables in a window that
+  slides from low to high.  Assumes that no dead nodes are present.
+  Uses an event-driven approach to determine convergence.
 
-  Description [Reorders by repeatedly applying a sliding window of width
-  2. Tries both permutations of the variables in a window
-  that slides from low to high.  Assumes that no dead nodes are
-  present.  Uses an event-driven approach to determine convergence.
-  Returns 1 in case of success; 0 otherwise.]
+  @return 1 in case of success; 0 otherwise.
 
-  SideEffects [None]
+  @sideeffect None
 
-******************************************************************************/
+*/
 static int
 ddWindowConv2(
   DdManager * table,
@@ -284,94 +250,91 @@ ddWindowConv2(
     if (high-low < 1) return(ddWindowConv2(table,low,high));
 
     nwin = high-low;
-    events = ABC_ALLOC(int,nwin);
+    events = ALLOC(int,nwin);
     if (events == NULL) {
-        table->errorCode = CUDD_MEMORY_OUT;
-        return(0);
+	table->errorCode = CUDD_MEMORY_OUT;
+	return(0);
     }
     for (x=0; x<nwin; x++) {
-        events[x] = 1;
+	events[x] = 1;
     }
 
-    res = table->keys - table->isolated;
+    res = (int) (table->keys - table->isolated);
     do {
-        newevent = 0;
-        for (x=0; x<nwin; x++) {
-            if (events[x]) {
-                size = res;
-                res = cuddSwapInPlace(table,x+low,x+low+1);
-                if (res == 0) {
-                    ABC_FREE(events);
-                    return(0);
-                }
-                if (res >= size) { /* no improvement: undo permutation */
-                    res = cuddSwapInPlace(table,x+low,x+low+1);
-                    if (res == 0) {
-                        ABC_FREE(events);
-                        return(0);
-                    }
-                }
-                if (res < size) {
-                    if (x < nwin-1)     events[x+1] = 1;
-                    if (x > 0)          events[x-1] = 1;
-                    newevent = 1;
-                }
-                events[x] = 0;
+	newevent = 0;
+	for (x=0; x<nwin; x++) {
+	    if (events[x]) {
+		size = res;
+		res = cuddSwapInPlace(table,x+low,x+low+1);
+		if (res == 0) {
+		    FREE(events);
+		    return(0);
+		}
+		if (res >= size) { /* no improvement: undo permutation */
+		    res = cuddSwapInPlace(table,x+low,x+low+1);
+		    if (res == 0) {
+			FREE(events);
+			return(0);
+		    }
+		}
+		if (res < size) {
+		    if (x < nwin-1)	events[x+1] = 1;
+		    if (x > 0)		events[x-1] = 1;
+		    newevent = 1;
+		}
+		events[x] = 0;
 #ifdef DD_STATS
-                if (res < size) {
-                    (void) fprintf(table->out,"-");
-                } else {
-                    (void) fprintf(table->out,"=");
-                }
-                fflush(table->out);
+		if (res < size) {
+		    (void) fprintf(table->out,"-");
+		} else {
+		    (void) fprintf(table->out,"=");
+		}
+		fflush(table->out);
 #endif
-            }
-        }
+	    }
+	}
 #ifdef DD_STATS
-        if (newevent) {
-            (void) fprintf(table->out,"|");
-            fflush(table->out);
-        }
+	if (newevent) {
+	    (void) fprintf(table->out,"|");
+	    fflush(table->out);
+	}
 #endif
     } while (newevent);
 
-    ABC_FREE(events);
+    FREE(events);
 
     return(1);
 
 } /* end of ddWindowConv3 */
 
 
-/**Function********************************************************************
+/**
+  @brief Tries all the permutations of the three variables between
+  x and x+2 and retains the best.
 
-  Synopsis [Tries all the permutations of the three variables between
-  x and x+2 and retains the best.]
+  @details Assumes that no dead nodes are present.
 
-  Description [Tries all the permutations of the three variables between
-  x and x+2 and retains the best. Assumes that no dead nodes are
-  present.  Returns the index of the best permutation (1-6) in case of
-  success; 0 otherwise.Assumes that no dead nodes are present.  Returns
-  the index of the best permutation (1-6) in case of success; 0
-  otherwise.]
+  @return the index of the best permutation (1-6) in case of success;
+  0 otherwise.
 
-  SideEffects [None]
+  @sideeffect None
 
-******************************************************************************/
+*/
 static int
 ddPermuteWindow3(
   DdManager * table,
   int  x)
 {
     int y,z;
-    int size,sizeNew;
-    int best;
+    int	size,sizeNew;
+    int	best;
 
 #ifdef DD_DEBUG
     assert(table->dead == 0);
     assert(x+2 < table->size);
 #endif
 
-    size = table->keys - table->isolated;
+    size = (int) (table->keys - table->isolated);
     y = x+1; z = y+1;
 
     /* The permutation pattern is:
@@ -381,40 +344,40 @@ ddPermuteWindow3(
 #define ABC 1
     best = ABC;
 
-#define BAC 2
+#define	BAC 2
     sizeNew = cuddSwapInPlace(table,x,y);
     if (sizeNew < size) {
-        if (sizeNew == 0) return(0);
-        best = BAC;
-        size = sizeNew;
+	if (sizeNew == 0) return(0);
+	best = BAC;
+	size = sizeNew;
     }
 #define BCA 3
     sizeNew = cuddSwapInPlace(table,y,z);
     if (sizeNew < size) {
-        if (sizeNew == 0) return(0);
-        best = BCA;
-        size = sizeNew;
+	if (sizeNew == 0) return(0);
+	best = BCA;
+	size = sizeNew;
     }
 #define CBA 4
     sizeNew = cuddSwapInPlace(table,x,y);
     if (sizeNew < size) {
-        if (sizeNew == 0) return(0);
-        best = CBA;
-        size = sizeNew;
+	if (sizeNew == 0) return(0);
+	best = CBA;
+	size = sizeNew;
     }
 #define CAB 5
     sizeNew = cuddSwapInPlace(table,y,z);
     if (sizeNew < size) {
-        if (sizeNew == 0) return(0);
-        best = CAB;
-        size = sizeNew;
+	if (sizeNew == 0) return(0);
+	best = CAB;
+	size = sizeNew;
     }
 #define ACB 6
     sizeNew = cuddSwapInPlace(table,x,y);
     if (sizeNew < size) {
-        if (sizeNew == 0) return(0);
-        best = ACB;
-        size = sizeNew;
+	if (sizeNew == 0) return(0);
+	best = ACB;
+	size = sizeNew;
     }
 
     /* Now take the shortest route to the best permuytation.
@@ -427,7 +390,7 @@ ddPermuteWindow3(
     case ACB: break;
     case BAC: if (!cuddSwapInPlace(table,y,z)) return(0);
     case CAB: if (!cuddSwapInPlace(table,x,y)) return(0);
-               break;
+	       break;
     default: return(0);
     }
 
@@ -440,18 +403,18 @@ ddPermuteWindow3(
 } /* end of ddPermuteWindow3 */
 
 
-/**Function********************************************************************
+/**
+  @brief Reorders by applying a sliding window of width 3.
 
-  Synopsis    [Reorders by applying a sliding window of width 3.]
-
-  Description [Reorders by applying a sliding window of width 3.
-  Tries all possible permutations to the variables in a
+  @details Tries all possible permutations to the variables in a
   window that slides from low to high.  Assumes that no dead nodes are
-  present.  Returns 1 in case of success; 0 otherwise.]
+  present.
 
-  SideEffects [None]
+  @return 1 in case of success; 0 otherwise.
 
-******************************************************************************/
+  @sideeffect None
+
+*/
 static int
 ddWindow3(
   DdManager * table,
@@ -469,15 +432,15 @@ ddWindow3(
     if (high-low < 2) return(ddWindow2(table,low,high));
 
     for (x = low; x+1 < high; x++) {
-        res = ddPermuteWindow3(table,x);
-        if (res == 0) return(0);
+	res = ddPermuteWindow3(table,x);
+	if (res == 0) return(0);
 #ifdef DD_STATS
-        if (res == ABC) {
-            (void) fprintf(table->out,"=");
-        } else {
-            (void) fprintf(table->out,"-");
-        }
-        fflush(table->out);
+	if (res == ABC) {
+	    (void) fprintf(table->out,"=");
+	} else {
+	    (void) fprintf(table->out,"-");
+	}
+	fflush(table->out);
 #endif
     }
 
@@ -486,19 +449,18 @@ ddWindow3(
 } /* end of ddWindow3 */
 
 
-/**Function********************************************************************
+/**
+  @brief Reorders by repeatedly applying a sliding window of width 3.
 
-  Synopsis    [Reorders by repeatedly applying a sliding window of width 3.]
-
-  Description [Reorders by repeatedly applying a sliding window of width
-  3. Tries all possible permutations to the variables in a
+  @details Tries all possible permutations to the variables in a
   window that slides from low to high.  Assumes that no dead nodes are
   present.  Uses an event-driven approach to determine convergence.
-  Returns 1 in case of success; 0 otherwise.]
 
-  SideEffects [None]
+  @return 1 in case of success; 0 otherwise.
 
-******************************************************************************/
+  @sideeffect None
+
+*/
 static int
 ddWindowConv3(
   DdManager * table,
@@ -518,100 +480,99 @@ ddWindowConv3(
     if (high-low < 2) return(ddWindowConv2(table,low,high));
 
     nwin = high-low-1;
-    events = ABC_ALLOC(int,nwin);
+    events = ALLOC(int,nwin);
     if (events == NULL) {
-        table->errorCode = CUDD_MEMORY_OUT;
-        return(0);
+	table->errorCode = CUDD_MEMORY_OUT;
+	return(0);
     }
     for (x=0; x<nwin; x++) {
-        events[x] = 1;
+	events[x] = 1;
     }
 
     do {
-        newevent = 0;
-        for (x=0; x<nwin; x++) {
-            if (events[x]) {
-                res = ddPermuteWindow3(table,x+low);
-                switch (res) {
-                case ABC:
-                    break;
-                case BAC:
-                    if (x < nwin-1)     events[x+1] = 1;
-                    if (x > 1)          events[x-2] = 1;
-                    newevent = 1;
-                    break;
-                case BCA:
-                case CBA:
-                case CAB:
-                    if (x < nwin-2)     events[x+2] = 1;
-                    if (x < nwin-1)     events[x+1] = 1;
-                    if (x > 0)          events[x-1] = 1;
-                    if (x > 1)          events[x-2] = 1;
-                    newevent = 1;
-                    break;
-                case ACB:
-                    if (x < nwin-2)     events[x+2] = 1;
-                    if (x > 0)          events[x-1] = 1;
-                    newevent = 1;
-                    break;
-                default:
-                    ABC_FREE(events);
-                    return(0);
-                }
-                events[x] = 0;
+	newevent = 0;
+	for (x=0; x<nwin; x++) {
+	    if (events[x]) {
+		res = ddPermuteWindow3(table,x+low);
+		switch (res) {
+		case ABC:
+		    break;
+		case BAC:
+		    if (x < nwin-1)	events[x+1] = 1;
+		    if (x > 1)		events[x-2] = 1;
+		    newevent = 1;
+		    break;
+		case BCA:
+		case CBA:
+		case CAB:
+		    if (x < nwin-2)	events[x+2] = 1;
+		    if (x < nwin-1)	events[x+1] = 1;
+		    if (x > 0)		events[x-1] = 1;
+		    if (x > 1)		events[x-2] = 1;
+		    newevent = 1;
+		    break;
+		case ACB:
+		    if (x < nwin-2)	events[x+2] = 1;
+		    if (x > 0)		events[x-1] = 1;
+		    newevent = 1;
+		    break;
+		default:
+		    FREE(events);
+		    return(0);
+		}
+		events[x] = 0;
 #ifdef DD_STATS
-                if (res == ABC) {
-                    (void) fprintf(table->out,"=");
-                } else {
-                    (void) fprintf(table->out,"-");
-                }
-                fflush(table->out);
+		if (res == ABC) {
+		    (void) fprintf(table->out,"=");
+		} else {
+		    (void) fprintf(table->out,"-");
+		}
+		fflush(table->out);
 #endif
-            }
-        }
+	    }
+	}
 #ifdef DD_STATS
-        if (newevent) {
-            (void) fprintf(table->out,"|");
-            fflush(table->out);
-        }
+	if (newevent) {
+	    (void) fprintf(table->out,"|");
+	    fflush(table->out);
+	}
 #endif
     } while (newevent);
 
-    ABC_FREE(events);
+    FREE(events);
 
     return(1);
 
 } /* end of ddWindowConv3 */
 
 
-/**Function********************************************************************
+/**
+  @brief Tries all the permutations of the four variables between w
+  and w+3 and retains the best.
 
-  Synopsis [Tries all the permutations of the four variables between w
-  and w+3 and retains the best.]
+  @details Assumes that no dead nodes are present.
 
-  Description [Tries all the permutations of the four variables between
-  w and w+3 and retains the best. Assumes that no dead nodes are
-  present.  Returns the index of the best permutation (1-24) in case of
-  success; 0 otherwise.]
+  @return the index of the best permutation (1-24) in case of success;
+  0 otherwise.
 
-  SideEffects [None]
+  @sideeffect None
 
-******************************************************************************/
+*/
 static int
 ddPermuteWindow4(
   DdManager * table,
   int  w)
 {
     int x,y,z;
-    int size,sizeNew;
-    int best;
+    int	size,sizeNew;
+    int	best;
 
 #ifdef DD_DEBUG
     assert(table->dead == 0);
     assert(w+3 < table->size);
 #endif
 
-    size = table->keys - table->isolated;
+    size = (int) (table->keys - table->isolated);
     x = w+1; y = x+1; z = y+1;
 
     /* The permutation pattern is:
@@ -630,166 +591,166 @@ ddPermuteWindow4(
 #define ABCD 1
     best = ABCD;
 
-#define BACD 7
+#define	BACD 7
     sizeNew = cuddSwapInPlace(table,w,x);
     if (sizeNew < size) {
-        if (sizeNew == 0) return(0);
-        best = BACD;
-        size = sizeNew;
+	if (sizeNew == 0) return(0);
+	best = BACD;
+	size = sizeNew;
     }
 #define BADC 13
     sizeNew = cuddSwapInPlace(table,y,z);
     if (sizeNew < size) {
-        if (sizeNew == 0) return(0);
-        best = BADC;
-        size = sizeNew;
+	if (sizeNew == 0) return(0);
+	best = BADC;
+	size = sizeNew;
     }
 #define ABDC 8
     sizeNew = cuddSwapInPlace(table,w,x);
     if (sizeNew < size || (sizeNew == size && ABDC < best)) {
-        if (sizeNew == 0) return(0);
-        best = ABDC;
-        size = sizeNew;
+	if (sizeNew == 0) return(0);
+	best = ABDC;
+	size = sizeNew;
     }
 #define ADBC 14
     sizeNew = cuddSwapInPlace(table,x,y);
     if (sizeNew < size) {
-        if (sizeNew == 0) return(0);
-        best = ADBC;
-        size = sizeNew;
+	if (sizeNew == 0) return(0);
+	best = ADBC;
+	size = sizeNew;
     }
 #define ADCB 9
     sizeNew = cuddSwapInPlace(table,y,z);
     if (sizeNew < size || (sizeNew == size && ADCB < best)) {
-        if (sizeNew == 0) return(0);
-        best = ADCB;
-        size = sizeNew;
+	if (sizeNew == 0) return(0);
+	best = ADCB;
+	size = sizeNew;
     }
 #define DACB 15
     sizeNew = cuddSwapInPlace(table,w,x);
     if (sizeNew < size) {
-        if (sizeNew == 0) return(0);
-        best = DACB;
-        size = sizeNew;
+	if (sizeNew == 0) return(0);
+	best = DACB;
+	size = sizeNew;
     }
 #define DABC 20
     sizeNew = cuddSwapInPlace(table,y,z);
     if (sizeNew < size) {
-        if (sizeNew == 0) return(0);
-        best = DABC;
-        size = sizeNew;
+	if (sizeNew == 0) return(0);
+	best = DABC;
+	size = sizeNew;
     }
 #define DBAC 23
     sizeNew = cuddSwapInPlace(table,x,y);
     if (sizeNew < size) {
-        if (sizeNew == 0) return(0);
-        best = DBAC;
-        size = sizeNew;
+	if (sizeNew == 0) return(0);
+	best = DBAC;
+	size = sizeNew;
     }
 #define BDAC 19
     sizeNew = cuddSwapInPlace(table,w,x);
     if (sizeNew < size || (sizeNew == size && BDAC < best)) {
-        if (sizeNew == 0) return(0);
-        best = BDAC;
-        size = sizeNew;
+	if (sizeNew == 0) return(0);
+	best = BDAC;
+	size = sizeNew;
     }
 #define BDCA 21
     sizeNew = cuddSwapInPlace(table,y,z);
     if (sizeNew < size || (sizeNew == size && BDCA < best)) {
-        if (sizeNew == 0) return(0);
-        best = BDCA;
-        size = sizeNew;
+	if (sizeNew == 0) return(0);
+	best = BDCA;
+	size = sizeNew;
     }
 #define DBCA 24
     sizeNew = cuddSwapInPlace(table,w,x);
     if (sizeNew < size) {
-        if (sizeNew == 0) return(0);
-        best = DBCA;
-        size = sizeNew;
+	if (sizeNew == 0) return(0);
+	best = DBCA;
+	size = sizeNew;
     }
 #define DCBA 22
     sizeNew = cuddSwapInPlace(table,x,y);
     if (sizeNew < size || (sizeNew == size && DCBA < best)) {
-        if (sizeNew == 0) return(0);
-        best = DCBA;
-        size = sizeNew;
+	if (sizeNew == 0) return(0);
+	best = DCBA;
+	size = sizeNew;
     }
 #define DCAB 18
     sizeNew = cuddSwapInPlace(table,y,z);
     if (sizeNew < size || (sizeNew == size && DCAB < best)) {
-        if (sizeNew == 0) return(0);
-        best = DCAB;
-        size = sizeNew;
+	if (sizeNew == 0) return(0);
+	best = DCAB;
+	size = sizeNew;
     }
 #define CDAB 12
     sizeNew = cuddSwapInPlace(table,w,x);
     if (sizeNew < size || (sizeNew == size && CDAB < best)) {
-        if (sizeNew == 0) return(0);
-        best = CDAB;
-        size = sizeNew;
+	if (sizeNew == 0) return(0);
+	best = CDAB;
+	size = sizeNew;
     }
 #define CDBA 17
     sizeNew = cuddSwapInPlace(table,y,z);
     if (sizeNew < size || (sizeNew == size && CDBA < best)) {
-        if (sizeNew == 0) return(0);
-        best = CDBA;
-        size = sizeNew;
+	if (sizeNew == 0) return(0);
+	best = CDBA;
+	size = sizeNew;
     }
 #define CBDA 11
     sizeNew = cuddSwapInPlace(table,x,y);
     if (sizeNew < size || (sizeNew == size && CBDA < best)) {
-        if (sizeNew == 0) return(0);
-        best = CBDA;
-        size = sizeNew;
+	if (sizeNew == 0) return(0);
+	best = CBDA;
+	size = sizeNew;
     }
 #define BCDA 16
     sizeNew = cuddSwapInPlace(table,w,x);
     if (sizeNew < size || (sizeNew == size && BCDA < best)) {
-        if (sizeNew == 0) return(0);
-        best = BCDA;
-        size = sizeNew;
+	if (sizeNew == 0) return(0);
+	best = BCDA;
+	size = sizeNew;
     }
 #define BCAD 10
     sizeNew = cuddSwapInPlace(table,y,z);
     if (sizeNew < size || (sizeNew == size && BCAD < best)) {
-        if (sizeNew == 0) return(0);
-        best = BCAD;
-        size = sizeNew;
+	if (sizeNew == 0) return(0);
+	best = BCAD;
+	size = sizeNew;
     }
 #define CBAD 5
     sizeNew = cuddSwapInPlace(table,w,x);
     if (sizeNew < size || (sizeNew == size && CBAD < best)) {
-        if (sizeNew == 0) return(0);
-        best = CBAD;
-        size = sizeNew;
+	if (sizeNew == 0) return(0);
+	best = CBAD;
+	size = sizeNew;
     }
 #define CABD 3
     sizeNew = cuddSwapInPlace(table,x,y);
     if (sizeNew < size || (sizeNew == size && CABD < best)) {
-        if (sizeNew == 0) return(0);
-        best = CABD;
-        size = sizeNew;
+	if (sizeNew == 0) return(0);
+	best = CABD;
+	size = sizeNew;
     }
 #define CADB 6
     sizeNew = cuddSwapInPlace(table,y,z);
     if (sizeNew < size || (sizeNew == size && CADB < best)) {
-        if (sizeNew == 0) return(0);
-        best = CADB;
-        size = sizeNew;
+	if (sizeNew == 0) return(0);
+	best = CADB;
+	size = sizeNew;
     }
 #define ACDB 4
     sizeNew = cuddSwapInPlace(table,w,x);
     if (sizeNew < size || (sizeNew == size && ACDB < best)) {
-        if (sizeNew == 0) return(0);
-        best = ACDB;
-        size = sizeNew;
+	if (sizeNew == 0) return(0);
+	best = ACDB;
+	size = sizeNew;
     }
 #define ACBD 2
     sizeNew = cuddSwapInPlace(table,y,z);
     if (sizeNew < size || (sizeNew == size && ACBD < best)) {
-        if (sizeNew == 0) return(0);
-        best = ACBD;
-        size = sizeNew;
+	if (sizeNew == 0) return(0);
+	best = ACBD;
+	size = sizeNew;
     }
 
     /* Now take the shortest route to the best permutation.
@@ -806,29 +767,29 @@ ddPermuteWindow4(
     case DCBA: if (!cuddSwapInPlace(table,y,z)) return(0);
     case BCDA: if (!cuddSwapInPlace(table,x,y)) return(0);
     case CBDA: if (!cuddSwapInPlace(table,w,x)) return(0);
-               if (!cuddSwapInPlace(table,x,y)) return(0);
-               if (!cuddSwapInPlace(table,y,z)) return(0);
-               break;
+	       if (!cuddSwapInPlace(table,x,y)) return(0);
+	       if (!cuddSwapInPlace(table,y,z)) return(0);
+	       break;
     case DBAC: if (!cuddSwapInPlace(table,x,y)) return(0);
     case DCAB: if (!cuddSwapInPlace(table,w,x)) return(0);
     case DACB: if (!cuddSwapInPlace(table,y,z)) return(0);
     case BACD: if (!cuddSwapInPlace(table,x,y)) return(0);
     case CABD: if (!cuddSwapInPlace(table,w,x)) return(0);
-               break;
+	       break;
     case DABC: if (!cuddSwapInPlace(table,y,z)) return(0);
     case BADC: if (!cuddSwapInPlace(table,x,y)) return(0);
     case CADB: if (!cuddSwapInPlace(table,w,x)) return(0);
-               if (!cuddSwapInPlace(table,y,z)) return(0);
-               break;
+	       if (!cuddSwapInPlace(table,y,z)) return(0);
+	       break;
     case BDAC: if (!cuddSwapInPlace(table,x,y)) return(0);
     case CDAB: if (!cuddSwapInPlace(table,w,x)) return(0);
     case ADCB: if (!cuddSwapInPlace(table,y,z)) return(0);
     case ABCD: if (!cuddSwapInPlace(table,x,y)) return(0);
-               break;
+	       break;
     case BCAD: if (!cuddSwapInPlace(table,x,y)) return(0);
     case CBAD: if (!cuddSwapInPlace(table,w,x)) return(0);
-               if (!cuddSwapInPlace(table,x,y)) return(0);
-               break;
+	       if (!cuddSwapInPlace(table,x,y)) return(0);
+	       break;
     default: return(0);
     }
 
@@ -841,18 +802,18 @@ ddPermuteWindow4(
 } /* end of ddPermuteWindow4 */
 
 
-/**Function********************************************************************
+/**
+  @brief Reorders by applying a sliding window of width 4.
 
-  Synopsis    [Reorders by applying a sliding window of width 4.]
-
-  Description [Reorders by applying a sliding window of width 4.
-  Tries all possible permutations to the variables in a
+  @details Tries all possible permutations to the variables in a
   window that slides from low to high.  Assumes that no dead nodes are
-  present.  Returns 1 in case of success; 0 otherwise.]
+  present.
 
-  SideEffects [None]
+  @return 1 in case of success; 0 otherwise.
 
-******************************************************************************/
+  @sideeffect None
+
+*/
 static int
 ddWindow4(
   DdManager * table,
@@ -870,15 +831,15 @@ ddWindow4(
     if (high-low < 3) return(ddWindow3(table,low,high));
 
     for (w = low; w+2 < high; w++) {
-        res = ddPermuteWindow4(table,w);
-        if (res == 0) return(0);
+	res = ddPermuteWindow4(table,w);
+	if (res == 0) return(0);
 #ifdef DD_STATS
-        if (res == ABCD) {
-            (void) fprintf(table->out,"=");
-        } else {
-            (void) fprintf(table->out,"-");
-        }
-        fflush(table->out);
+	if (res == ABCD) {
+	    (void) fprintf(table->out,"=");
+	} else {
+	    (void) fprintf(table->out,"-");
+	}
+	fflush(table->out);
 #endif
     }
 
@@ -887,19 +848,18 @@ ddWindow4(
 } /* end of ddWindow4 */
 
 
-/**Function********************************************************************
+/**
+  @brief Reorders by repeatedly applying a sliding window of width 4.
 
-  Synopsis    [Reorders by repeatedly applying a sliding window of width 4.]
-
-  Description [Reorders by repeatedly applying a sliding window of width
-  4. Tries all possible permutations to the variables in a
+  @details Tries all possible permutations to the variables in a
   window that slides from low to high.  Assumes that no dead nodes are
   present.  Uses an event-driven approach to determine convergence.
-  Returns 1 in case of success; 0 otherwise.]
 
-  SideEffects [None]
+  @return 1 in case of success; 0 otherwise.
 
-******************************************************************************/
+  @sideeffect None
+
+*/
 static int
 ddWindowConv4(
   DdManager * table,
@@ -919,113 +879,111 @@ ddWindowConv4(
     if (high-low < 3) return(ddWindowConv3(table,low,high));
 
     nwin = high-low-2;
-    events = ABC_ALLOC(int,nwin);
+    events = ALLOC(int,nwin);
     if (events == NULL) {
-        table->errorCode = CUDD_MEMORY_OUT;
-        return(0);
+	table->errorCode = CUDD_MEMORY_OUT;
+	return(0);
     }
     for (x=0; x<nwin; x++) {
-        events[x] = 1;
+	events[x] = 1;
     }
 
     do {
-        newevent = 0;
-        for (x=0; x<nwin; x++) {
-            if (events[x]) {
-                res = ddPermuteWindow4(table,x+low);
-                switch (res) {
-                case ABCD:
-                    break;
-                case BACD:
-                    if (x < nwin-1)     events[x+1] = 1;
-                    if (x > 2)          events[x-3] = 1;
-                    newevent = 1;
-                    break;
-                case BADC:
-                    if (x < nwin-3)     events[x+3] = 1;
-                    if (x < nwin-1)     events[x+1] = 1;
-                    if (x > 0)          events[x-1] = 1;
-                    if (x > 2)          events[x-3] = 1;
-                    newevent = 1;
-                    break;
-                case ABDC:
-                    if (x < nwin-3)     events[x+3] = 1;
-                    if (x > 0)          events[x-1] = 1;
-                    newevent = 1;
-                    break;
-                case ADBC:
-                case ADCB:
-                case ACDB:
-                    if (x < nwin-3)     events[x+3] = 1;
-                    if (x < nwin-2)     events[x+2] = 1;
-                    if (x > 0)          events[x-1] = 1;
-                    if (x > 1)          events[x-2] = 1;
-                    newevent = 1;
-                    break;
-                case DACB:
-                case DABC:
-                case DBAC:
-                case BDAC:
-                case BDCA:
-                case DBCA:
-                case DCBA:
-                case DCAB:
-                case CDAB:
-                case CDBA:
-                case CBDA:
-                case BCDA:
-                case CADB:
-                    if (x < nwin-3)     events[x+3] = 1;
-                    if (x < nwin-2)     events[x+2] = 1;
-                    if (x < nwin-1)     events[x+1] = 1;
-                    if (x > 0)          events[x-1] = 1;
-                    if (x > 1)          events[x-2] = 1;
-                    if (x > 2)          events[x-3] = 1;
-                    newevent = 1;
-                    break;
-                case BCAD:
-                case CBAD:
-                case CABD:
-                    if (x < nwin-2)     events[x+2] = 1;
-                    if (x < nwin-1)     events[x+1] = 1;
-                    if (x > 1)          events[x-2] = 1;
-                    if (x > 2)          events[x-3] = 1;
-                    newevent = 1;
-                    break;
-                case ACBD:
-                    if (x < nwin-2)     events[x+2] = 1;
-                    if (x > 1)          events[x-2] = 1;
-                    newevent = 1;
-                    break;
-                default:
-                    ABC_FREE(events);
-                    return(0);
-                }
-                events[x] = 0;
+	newevent = 0;
+	for (x=0; x<nwin; x++) {
+	    if (events[x]) {
+		res = ddPermuteWindow4(table,x+low);
+		switch (res) {
+		case ABCD:
+		    break;
+		case BACD:
+		    if (x < nwin-1)	events[x+1] = 1;
+		    if (x > 2)		events[x-3] = 1;
+		    newevent = 1;
+		    break;
+		case BADC:
+		    if (x < nwin-3)	events[x+3] = 1;
+		    if (x < nwin-1)	events[x+1] = 1;
+		    if (x > 0)		events[x-1] = 1;
+		    if (x > 2)		events[x-3] = 1;
+		    newevent = 1;
+		    break;
+		case ABDC:
+		    if (x < nwin-3)	events[x+3] = 1;
+		    if (x > 0)		events[x-1] = 1;
+		    newevent = 1;
+		    break;
+		case ADBC:
+		case ADCB:
+		case ACDB:
+		    if (x < nwin-3)	events[x+3] = 1;
+		    if (x < nwin-2)	events[x+2] = 1;
+		    if (x > 0)		events[x-1] = 1;
+		    if (x > 1)		events[x-2] = 1;
+		    newevent = 1;
+		    break;
+		case DACB:
+		case DABC:
+		case DBAC:
+		case BDAC:
+		case BDCA:
+		case DBCA:
+		case DCBA:
+		case DCAB:
+		case CDAB:
+		case CDBA:
+		case CBDA:
+		case BCDA:
+		case CADB:
+		    if (x < nwin-3)	events[x+3] = 1;
+		    if (x < nwin-2)	events[x+2] = 1;
+		    if (x < nwin-1)	events[x+1] = 1;
+		    if (x > 0)		events[x-1] = 1;
+		    if (x > 1)		events[x-2] = 1;
+		    if (x > 2)		events[x-3] = 1;
+		    newevent = 1;
+		    break;
+		case BCAD:
+		case CBAD:
+		case CABD:
+		    if (x < nwin-2)	events[x+2] = 1;
+		    if (x < nwin-1)	events[x+1] = 1;
+		    if (x > 1)		events[x-2] = 1;
+		    if (x > 2)		events[x-3] = 1;
+		    newevent = 1;
+		    break;
+		case ACBD:
+		    if (x < nwin-2)	events[x+2] = 1;
+		    if (x > 1)		events[x-2] = 1;
+		    newevent = 1;
+		    break;
+		default:
+		    FREE(events);
+		    return(0);
+		}
+		events[x] = 0;
 #ifdef DD_STATS
-                if (res == ABCD) {
-                    (void) fprintf(table->out,"=");
-                } else {
-                    (void) fprintf(table->out,"-");
-                }
-                fflush(table->out);
+		if (res == ABCD) {
+		    (void) fprintf(table->out,"=");
+		} else {
+		    (void) fprintf(table->out,"-");
+		}
+		fflush(table->out);
 #endif
-            }
-        }
+	    }
+	}
 #ifdef DD_STATS
-        if (newevent) {
-            (void) fprintf(table->out,"|");
-            fflush(table->out);
-        }
+	if (newevent) {
+	    (void) fprintf(table->out,"|");
+	    fflush(table->out);
+	}
 #endif
     } while (newevent);
 
-    ABC_FREE(events);
+    FREE(events);
 
     return(1);
 
 } /* end of ddWindowConv4 */
 
-
 ABC_NAMESPACE_IMPL_END
-

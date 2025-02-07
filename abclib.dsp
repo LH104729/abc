@@ -4123,6 +4123,10 @@ SOURCE=.\src\misc\util\utilColor.c
 # End Source File
 # Begin Source File
 
+SOURCE=.\src\misc\util\utilCstringstream.h
+# End Source File
+# Begin Source File
+
 SOURCE=.\src\misc\util\utilDouble.h
 # End Source File
 # Begin Source File

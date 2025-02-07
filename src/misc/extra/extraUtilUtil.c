@@ -347,7 +347,7 @@ void Extra_UtilMMout_Of_Memory( long size )
   SeeAlso     []
 
 ***********************************************************************/
-void (*Extra_UtilMMoutOfMemory)( long size ) = (void (*)( long size ))Extra_UtilMMout_Of_Memory;
+void (*Extra_UtilMMoutOfMemory)( unsigned long size ) = (void (*)( unsigned long size ))Extra_UtilMMout_Of_Memory;
 
 
 /**Function*************************************************************

@@ -1,52 +1,31 @@
-/**CFile***********************************************************************
+/**
+  @file
 
-  FileName    [cuddGenetic.c]
+  @ingroup cudd
 
-  PackageName [cudd]
+  @brief Genetic algorithm for variable reordering.
 
-  Synopsis    [Genetic algorithm for variable reordering.]
+  @details The genetic algorithm implemented here is as follows.  We
+  start with the current %DD order.  We sift this order and use this as
+  the reference %DD.  We only keep 1 %DD around for the entire process
+  and simply rearrange the order of this %DD, storing the various
+  orders and their corresponding %DD sizes.  We generate more random
+  orders to build an initial population. This initial population is 3
+  times the number of variables, with a maximum of 120. Each random
+  order is built (from the reference %DD) and its size stored.  Each
+  random order is also sifted to keep the %DD sizes fairly small.  Then
+  a crossover is performed between two orders (picked randomly) and
+  the two resulting DDs are built and sifted.  For each new order, if
+  its size is smaller than any %DD in the population, it is inserted
+  into the population and the %DD with the largest number of nodes is
+  thrown out. The crossover process happens up to 50 times, and at
+  this point the %DD in the population with the smallest size is chosen
+  as the result.  This %DD must then be built from the reference %DD.
 
-  Description [Internal procedures included in this file:
-                <ul>
-                <li> cuddGa()
-                </ul>
-        Static procedures included in this module:
-                <ul>
-                <li> make_random()
-                <li> sift_up()
-                <li> build_dd()
-                <li> largest()
-                <li> rand_int()
-                <li> array_hash()
-                <li> array_compare()
-                <li> find_best()
-                <li> find_average_fitness()
-                <li> PMX()
-                <li> roulette()
-                </ul>
+  @author Curt Musfeldt, Alan Shuler, Fabio Somenzi
 
-  The genetic algorithm implemented here is as follows.  We start with
-  the current DD order.  We sift this order and use this as the
-  reference DD.  We only keep 1 DD around for the entire process and
-  simply rearrange the order of this DD, storing the various orders
-  and their corresponding DD sizes.  We generate more random orders to
-  build an initial population. This initial population is 3 times the
-  number of variables, with a maximum of 120. Each random order is
-  built (from the reference DD) and its size stored.  Each random
-  order is also sifted to keep the DD sizes fairly small.  Then a
-  crossover is performed between two orders (picked randomly) and the
-  two resulting DDs are built and sifted.  For each new order, if its
-  size is smaller than any DD in the population, it is inserted into
-  the population and the DD with the largest number of nodes is thrown
-  out. The crossover process happens up to 50 times, and at this point
-  the DD in the population with the smallest size is chosen as the
-  result.  This DD must then be built from the reference DD.]
-
-  SeeAlso     []
-
-  Author      [Curt Musfeldt, Alan Shuler, Fabio Somenzi]
-
-  Copyright   [Copyright (c) 1995-2004, Regents of the University of Colorado
+  @copyright@parblock
+  Copyright (c) 1995-2015, Regents of the University of Colorado
 
   All rights reserved.
 
@@ -76,85 +55,91 @@
   CAUSED AND ON ANY THEORY OF LIABILITY, WHETHER IN CONTRACT, STRICT
   LIABILITY, OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN
   ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE
-  POSSIBILITY OF SUCH DAMAGE.]
+  POSSIBILITY OF SUCH DAMAGE.
+  @endparblock
 
-******************************************************************************/
+*/
 
 #include "misc/util/util_hack.h"
 #include "cuddInt.h"
 
 ABC_NAMESPACE_IMPL_START
-
-
-
 /*---------------------------------------------------------------------------*/
 /* Constant declarations                                                     */
-/*---------------------------------------------------------------------------*/
-
-/*---------------------------------------------------------------------------*/
-/* Stucture declarations                                                     */
 /*---------------------------------------------------------------------------*/
 
 /*---------------------------------------------------------------------------*/
 /* Type declarations                                                         */
 /*---------------------------------------------------------------------------*/
 
+typedef struct GeneticInfo GeneticInfo_t;
+
+/*---------------------------------------------------------------------------*/
+/* Stucture declarations                                                     */
+/*---------------------------------------------------------------------------*/
+
+/**
+ * @brief Miscellaneous information.
+ */
+struct GeneticInfo {
+    int popsize;	/**< the size of the population */
+    int numvars;	/**< the number of variables to be ordered. */
+/**
+ ** @brief storedd stores the population orders and sizes.
+ **
+ ** @details This table has two extra rows and one extras column. The
+ ** two extra rows are used for the offspring produced by a
+ ** crossover. Each row stores one order and its size. The order is
+ ** stored by storing the indices of variables in the order in which
+ ** they appear in the order. The table is in reality a
+ ** one-dimensional array which is accessed via a macro to give the
+ ** illusion it is a two-dimensional structure.
+ */
+    int *storedd;
+    st__table *computed;	/**< hash table to identify existing orders */
+    int *repeat;	/**< how many times an order is present */
+    int large;		/**< stores the index of the population with
+                         ** the largest number of nodes in the %DD */
+    int result;		/**< result */
+    int cross;		/**< the number of crossovers to perform */
+};
+
 /*---------------------------------------------------------------------------*/
 /* Variable declarations                                                     */
 /*---------------------------------------------------------------------------*/
 
-#ifndef lint
-static char rcsid[] DD_UNUSED = "$Id: cuddGenetic.c,v 1.28 2004/08/13 18:04:48 fabio Exp $";
-#endif
-
-static int popsize;             /* the size of the population */
-static int numvars;             /* the number of input variables in the ckt. */
-/* storedd stores the population orders and sizes. This table has two
-** extra rows and one extras column. The two extra rows are used for the
-** offspring produced by a crossover. Each row stores one order and its
-** size. The order is stored by storing the indices of variables in the
-** order in which they appear in the order. The table is in reality a
-** one-dimensional array which is accessed via a macro to give the illusion
-** it is a two-dimensional structure.
-*/
-static int *storedd;
-static st__table *computed;      /* hash table to identify existing orders */
-static int *repeat;             /* how many times an order is present */
-static int large;               /* stores the index of the population with
-                                ** the largest number of nodes in the DD */
-static int result;
-static int cross;               /* the number of crossovers to perform */
 
 /*---------------------------------------------------------------------------*/
 /* Macro declarations                                                        */
 /*---------------------------------------------------------------------------*/
 
-/* macro used to access the population table as if it were a
-** two-dimensional structure.
-*/
-#define STOREDD(i,j)    storedd[(i)*(numvars+1)+(j)]
+/**
+ ** @brief Used to access the population table as if it were a
+ ** two-dimensional structure.
+ */
+#define STOREDD(info,i,j)	(info)->storedd[(i)*((info)->numvars+1)+(j)]
 
-/**AutomaticStart*************************************************************/
+/** \cond */
 
 /*---------------------------------------------------------------------------*/
 /* Static function prototypes                                                */
 /*---------------------------------------------------------------------------*/
 
-static int make_random (DdManager *table, int lower);
+static int make_random (DdManager *table, int lower, GeneticInfo_t * info);
 static int sift_up (DdManager *table, int x, int x_low);
-static int build_dd (DdManager *table, int num, int lower, int upper);
-static int largest (void);
-static int rand_int (int a);
-static int array_hash (const char *array, int modulus);
-static int array_compare (const char *array1, const char *array2);
-static int find_best (void);
+static int build_dd (DdManager *table, int num, int lower, int upper, GeneticInfo_t * info);
+static int largest (GeneticInfo_t * info);
+static int rand_int (DdManager * dd, int a);
+static int array_hash (char const *array, int modulus, char const * arg);
+static int array_compare (const char *array1, const char *array2, char const * arg);
+static int find_best (GeneticInfo_t * info);
 #ifdef DD_STATS
-static double find_average_fitness (void);
+static double find_average_fitness (GeneticInfo_t * info);
 #endif
-static int PMX (int maxvar);
-static int roulette (int *p1, int *p2);
+static int PMX (DdManager * dd, int maxvar, GeneticInfo_t * info);
+static int roulette (DdManager *dd, int *p1, int *p2, GeneticInfo_t * info);
 
-/**AutomaticEnd***************************************************************/
+/** \endcond */
 
 /*---------------------------------------------------------------------------*/
 /* Definition of exported functions                                          */
@@ -165,54 +150,52 @@ static int roulette (int *p1, int *p2);
 /*---------------------------------------------------------------------------*/
 
 
-/**Function********************************************************************
+/**
+  @brief Genetic algorithm for %DD reordering.
 
-  Synopsis    [Genetic algorithm for DD reordering.]
-
-  Description [Genetic algorithm for DD reordering.
-  The two children of a crossover will be stored in
+  @details The two children of a crossover will be stored in
   storedd[popsize] and storedd[popsize+1] --- the last two slots in the
   storedd array.  (This will make comparisons and replacement easy.)
-  Returns 1 in case of success; 0 otherwise.]
 
-  SideEffects [None]
+  @return 1 in case of success; 0 otherwise.
 
-  SeeAlso     []
+  @sideeffect None
 
-******************************************************************************/
+*/
 int
 cuddGa(
-  DdManager * table /* manager */,
-  int  lower /* lowest level to be reordered */,
-  int  upper /* highest level to be reorderded */)
+  DdManager * table /**< manager */,
+  int  lower /**< lowest level to be reordered */,
+  int  upper /**< highest level to be reorderded */)
 {
-    int         i,n,m;          /* dummy/loop vars */
-    int         index;
+    int 	i,n,m;		/* dummy/loop vars */
+    int		index;
 #ifdef DD_STATS
-    double      average_fitness;
+    double	average_fitness;
 #endif
-    int         small;          /* index of smallest DD in population */
+    int		small;		/* index of smallest DD in population */
+    GeneticInfo_t info;
 
     /* Do an initial sifting to produce at least one reasonable individual. */
     if (!cuddSifting(table,lower,upper)) return(0);
 
     /* Get the initial values. */
-    numvars = upper - lower + 1; /* number of variables to be reordered */
+    info.numvars = upper - lower + 1; /* number of variables to be reordered */
     if (table->populationSize == 0) {
-        popsize = 3 * numvars;  /* population size is 3 times # of vars */
-        if (popsize > 120) {
-            popsize = 120;      /* Maximum population size is 120 */
-        }
+	info.popsize = 3 * info.numvars;  /* population size is 3 times # of vars */
+	if (info.popsize > 120) {
+	    info.popsize = 120;	/* Maximum population size is 120 */
+	}
     } else {
-        popsize = table->populationSize;  /* user specified value */
+	info.popsize = table->populationSize;  /* user specified value */
     }
-    if (popsize < 4) popsize = 4;       /* enforce minimum population size */
+    if (info.popsize < 4) info.popsize = 4;	/* enforce minimum population size */
 
     /* Allocate population table. */
-    storedd = ABC_ALLOC(int,(popsize+2)*(numvars+1));
-    if (storedd == NULL) {
-        table->errorCode = CUDD_MEMORY_OUT;
-        return(0);
+    info.storedd = ALLOC(int,(info.popsize+2)*(info.numvars+1));
+    if (info.storedd == NULL) {
+	table->errorCode = CUDD_MEMORY_OUT;
+	return(0);
     }
 
     /* Initialize the computed table. This table is made up of two data
@@ -223,41 +206,43 @@ cuddGa(
     ** one has a repeat count greater than 1. This copy is the one pointed
     ** by the computed table.
     */
-    repeat = ABC_ALLOC(int,popsize);
-    if (repeat == NULL) {
-        table->errorCode = CUDD_MEMORY_OUT;
-        ABC_FREE(storedd);
-        return(0);
+    info.repeat = ALLOC(int,info.popsize);
+    if (info.repeat == NULL) {
+	table->errorCode = CUDD_MEMORY_OUT;
+	FREE(info.storedd);
+	return(0);
     }
-    for (i = 0; i < popsize; i++) {
-        repeat[i] = 0;
+    for (i = 0; i < info.popsize; i++) {
+	info.repeat[i] = 0;
     }
-    computed = st__init_table(array_compare,array_hash);
-    if (computed == NULL) {
-        table->errorCode = CUDD_MEMORY_OUT;
-        ABC_FREE(storedd);
-        ABC_FREE(repeat);
-        return(0);
+    info.computed = st__init_table_with_arg(array_compare,array_hash,
+                                           (void *)(ptrint) info.numvars);
+    if (info.computed == NULL) {
+	table->errorCode = CUDD_MEMORY_OUT;
+	FREE(info.storedd);
+	FREE(info.repeat);
+	return(0);
     }
 
     /* Copy the current DD and its size to the population table. */
-    for (i = 0; i < numvars; i++) {
-        STOREDD(0,i) = table->invperm[i+lower]; /* order of initial DD */
+    for (i = 0; i < info.numvars; i++) {
+	STOREDD(&info,0,i) = table->invperm[i+lower]; /* order of initial DD */
     }
-    STOREDD(0,numvars) = table->keys - table->isolated; /* size of initial DD */
+    STOREDD(&info,0,info.numvars) =
+        (int) (table->keys - table->isolated); /* size of initial DD */
 
     /* Store the initial order in the computed table. */
-    if ( st__insert(computed,(char *)storedd,(char *) 0) == st__OUT_OF_MEM) {
-        ABC_FREE(storedd);
-        ABC_FREE(repeat);
-        st__free_table(computed);
-        return(0);
+    if (st__insert(info.computed,info.storedd,(void *) 0) == st__OUT_OF_MEM) {
+	FREE(info.storedd);
+	FREE(info.repeat);
+	st__free_table(info.computed);
+	return(0);
     }
-    repeat[0]++;
+    info.repeat[0]++;
 
     /* Insert the reverse order as second element of the population. */
-    for (i = 0; i < numvars; i++) {
-        STOREDD(1,numvars-1-i) = table->invperm[i+lower]; /* reverse order */
+    for (i = 0; i < info.numvars; i++) {
+	STOREDD(&info,1,info.numvars-1-i) = table->invperm[i+lower]; /* reverse order */
     }
 
     /* Now create the random orders. make_random fills the population
@@ -265,157 +250,159 @@ cuddGa(
     ** the DDs for the reverse order and each random permutation, and stores
     ** the results in the computed table.
     */
-    if (!make_random(table,lower)) {
-        table->errorCode = CUDD_MEMORY_OUT;
-        ABC_FREE(storedd);
-        ABC_FREE(repeat);
-        st__free_table(computed);
-        return(0);
+    if (!make_random(table,lower,&info)) {
+	table->errorCode = CUDD_MEMORY_OUT;
+	FREE(info.storedd);
+	FREE(info.repeat);
+	st__free_table(info.computed);
+	return(0);
     }
-    for (i = 1; i < popsize; i++) {
-        result = build_dd(table,i,lower,upper); /* build and sift order */
-        if (!result) {
-            ABC_FREE(storedd);
-            ABC_FREE(repeat);
-            st__free_table(computed);
-            return(0);
-        }
-        if ( st__lookup_int(computed,(char *)&STOREDD(i,0),&index)) {
-            repeat[index]++;
-        } else {
-            if ( st__insert(computed,(char *)&STOREDD(i,0),(char *)(long)i) ==
-            st__OUT_OF_MEM) {
-                ABC_FREE(storedd);
-                ABC_FREE(repeat);
-                st__free_table(computed);
-                return(0);
-            }
-            repeat[i]++;
-        }
+    for (i = 1; i < info.popsize; i++) {
+	info.result = build_dd(table,i,lower,upper,&info);	/* build and sift order */
+	if (!info.result) {
+	    FREE(info.storedd);
+	    FREE(info.repeat);
+	    st__free_table(info.computed);
+	    return(0);
+	}
+	if (st__lookup_int(info.computed,&STOREDD(&info,i,0),&index)) {
+	    info.repeat[index]++;
+	} else {
+	    if (st__insert(info.computed,&STOREDD(&info,i,0),(void *)(ptruint)i) ==
+	    st__OUT_OF_MEM) {
+		FREE(info.storedd);
+		FREE(info.repeat);
+		st__free_table(info.computed);
+		return(0);
+	    }
+	    info.repeat[i]++;
+	}
     }
 
 #if 0
 #ifdef DD_STATS
     /* Print the initial population. */
     (void) fprintf(table->out,"Initial population after sifting\n");
-    for (m = 0; m < popsize; m++) {
-        for (i = 0; i < numvars; i++) {
-            (void) fprintf(table->out," %2d",STOREDD(m,i));
-        }
-        (void) fprintf(table->out," : %3d (%d)\n",
-                       STOREDD(m,numvars),repeat[m]);
+    for (m = 0; m < info.popsize; m++) {
+	for (i = 0; i < info.numvars; i++) {
+	    (void) fprintf(table->out," %2d",STOREDD(&info,m,i));
+	}
+	(void) fprintf(table->out," : %3d (%d)\n",
+		       STOREDD(&info,m,numvars),info.repeat[m]);
     }
 #endif
 #endif
 
-    small = find_best();
 #ifdef DD_STATS
-    average_fitness = find_average_fitness();
-    (void) fprintf(table->out,"\nInitial population: best fitness = %d, average fitness %8.3f",STOREDD(small,numvars),average_fitness);
+    small = find_best(&info);
+    average_fitness = find_average_fitness(&info);
+    (void) fprintf(table->out,"\nInitial population: best fitness = %d, average fitness %8.3f",STOREDD(&info,small,info.numvars),average_fitness);
 #endif
 
     /* Decide how many crossovers should be tried. */
     if (table->numberXovers == 0) {
-        cross = 3*numvars;
-        if (cross > 60) {       /* do a maximum of 50 crossovers */
-            cross = 60;
-        }
+	info.cross = 3*info.numvars;
+	if (info.cross > 60) {	/* do a maximum of 50 crossovers */
+	    info.cross = 60;
+	}
     } else {
-        cross = table->numberXovers;      /* use user specified value */
+	info.cross = table->numberXovers;      /* use user specified value */
+    }
+    if (info.cross >= info.popsize) {
+	info.cross = info.popsize;
     }
 
     /* Perform the crossovers to get the best order. */
-    for (m = 0; m < cross; m++) {
-        if (!PMX(table->size)) {        /* perform one crossover */
-            table->errorCode = CUDD_MEMORY_OUT;
-            ABC_FREE(storedd);
-            ABC_FREE(repeat);
-            st__free_table(computed);
-            return(0);
-        }
-        /* The offsprings are left in the last two entries of the
-        ** population table. These are now considered in turn.
-        */
-        for (i = popsize; i <= popsize+1; i++) {
-            result = build_dd(table,i,lower,upper); /* build and sift child */
-            if (!result) {
-                ABC_FREE(storedd);
-                ABC_FREE(repeat);
-                st__free_table(computed);
-                return(0);
-            }
-            large = largest();  /* find the largest DD in population */
+    for (m = 0; m < info.cross; m++) {
+	if (!PMX(table, table->size, &info)) {	/* perform one crossover */
+	    table->errorCode = CUDD_MEMORY_OUT;
+	    FREE(info.storedd);
+	    FREE(info.repeat);
+	    st__free_table(info.computed);
+	    return(0);
+	}
+	/* The offsprings are left in the last two entries of the
+	** population table. These are now considered in turn.
+	*/
+	for (i = info.popsize; i <= info.popsize+1; i++) {
+	    info.result = build_dd(table,i,lower,upper,&info); /* build and sift child */
+	    if (!info.result) {
+		FREE(info.storedd);
+		FREE(info.repeat);
+		st__free_table(info.computed);
+		return(0);
+	    }
+	    info.large = largest(&info); /* find the largest DD in population */
 
-            /* If the new child is smaller than the largest DD in the current
-            ** population, enter it into the population in place of the
-            ** largest DD.
-            */
-            if (STOREDD(i,numvars) < STOREDD(large,numvars)) {
-                /* Look up the largest DD in the computed table.
-                ** Decrease its repetition count. If the repetition count
-                ** goes to 0, remove the largest DD from the computed table.
-                */
-                result = st__lookup_int(computed,(char *)&STOREDD(large,0),
-                                       &index);
-                if (!result) {
-                    ABC_FREE(storedd);
-                    ABC_FREE(repeat);
-                    st__free_table(computed);
-                    return(0);
-                }
-                repeat[index]--;
-                if (repeat[index] == 0) {
-                    int *pointer = &STOREDD(index,0);
-                    result = st__delete(computed, (const char **)&pointer, NULL);
-                    if (!result) {
-                        ABC_FREE(storedd);
-                        ABC_FREE(repeat);
-                        st__free_table(computed);
-                        return(0);
-                    }
-                }
-                /* Copy the new individual to the entry of the
-                ** population table just made available and update the
-                ** computed table.
-                */
-                for (n = 0; n <= numvars; n++) {
-                    STOREDD(large,n) = STOREDD(i,n);
-                }
-                if ( st__lookup_int(computed,(char *)&STOREDD(large,0),
-                                  &index)) {
-                    repeat[index]++;
-                } else {
-                    if ( st__insert(computed,(char *)&STOREDD(large,0),
-                    (char *)(long)large) == st__OUT_OF_MEM) {
-                        ABC_FREE(storedd);
-                        ABC_FREE(repeat);
-                        st__free_table(computed);
-                        return(0);
-                    }
-                    repeat[large]++;
-                }
-            }
-        }
+	    /* If the new child is smaller than the largest DD in the current
+	    ** population, enter it into the population in place of the
+	    ** largest DD.
+	    */
+	    if (STOREDD(&info,i,info.numvars) <
+                STOREDD(&info,info.large,info.numvars)) {
+		/* Look up the largest DD in the computed table.
+		** Decrease its repetition count. If the repetition count
+		** goes to 0, remove the largest DD from the computed table.
+		*/
+		info.result = st__lookup_int(info.computed,&STOREDD(&info,info.large,0),&index);
+		if (!info.result) {
+		    FREE(info.storedd);
+		    FREE(info.repeat);
+		    st__free_table(info.computed);
+		    return(0);
+		}
+		info.repeat[index]--;
+		if (info.repeat[index] == 0) {
+		    int *pointer = &STOREDD(&info,index,0);
+		    info.result = st__delete(info.computed, (void **) &pointer, NULL);
+		    if (!info.result) {
+			FREE(info.storedd);
+			FREE(info.repeat);
+			st__free_table(info.computed);
+			return(0);
+		    }
+		}
+		/* Copy the new individual to the entry of the
+		** population table just made available and update the
+		** computed table.
+		*/
+		for (n = 0; n <= info.numvars; n++) {
+		    STOREDD(&info,info.large,n) = STOREDD(&info,i,n);
+		}
+		if (st__lookup_int(info.computed,&STOREDD(&info,info.large,0),&index)) {
+		    info.repeat[index]++;
+		} else {
+		    if (st__insert(info.computed,&STOREDD(&info,info.large,0),
+		    (void *)(ptruint)info.large) == st__OUT_OF_MEM) {
+			FREE(info.storedd);
+			FREE(info.repeat);
+			st__free_table(info.computed);
+			return(0);
+		    }
+		    info.repeat[info.large]++;
+		}
+	    }
+	}
     }
 
     /* Find the smallest DD in the population and build it;
     ** that will be the result.
     */
-    small = find_best();
+    small = find_best(&info);
 
     /* Print stats on the final population. */
 #ifdef DD_STATS
-    average_fitness = find_average_fitness();
-    (void) fprintf(table->out,"\nFinal population: best fitness = %d, average fitness %8.3f",STOREDD(small,numvars),average_fitness);
+    average_fitness = find_average_fitness(&info);
+    (void) fprintf(table->out,"\nFinal population: best fitness = %d, average fitness %8.3f",STOREDD(&info,small,info.numvars),average_fitness);
 #endif
 
     /* Clean up, build the result DD, and return. */
-    st__free_table(computed);
-    computed = NULL;
-    result = build_dd(table,small,lower,upper);
-    ABC_FREE(storedd);
-    ABC_FREE(repeat);
-    return(result);
+    st__free_table(info.computed);
+    info.computed = NULL;
+    info.result = build_dd(table,small,lower,upper,&info);
+    FREE(info.storedd);
+    FREE(info.repeat);
+    return(info.result);
 
 } /* end of cuddGa */
 
@@ -424,87 +411,82 @@ cuddGa(
 /* Definition of static functions                                            */
 /*---------------------------------------------------------------------------*/
 
-/**Function********************************************************************
+/**
+  @brief Generates the random sequences for the initial population.
 
-  Synopsis    [Generates the random sequences for the initial population.]
+  @details The sequences are permutations of the indices between lower
+  and upper in the current order.
 
-  Description [Generates the random sequences for the initial population.
-  The sequences are permutations of the indices between lower and
-  upper in the current order.]
+  @sideeffect None
 
-  SideEffects [None]
-
-  SeeAlso     []
-
-******************************************************************************/
+*/
 static int
 make_random(
   DdManager * table,
-  int  lower)
+  int  lower,
+  GeneticInfo_t * info)
 {
-    int i,j;            /* loop variables */
-    int *used;          /* is a number already in a permutation */
-    int next;           /* next random number without repetitions */
+    int i,j;		/* loop variables */
+    int	*used;		/* is a number already in a permutation */
+    int	next;		/* next random number without repetitions */
 
-    used = ABC_ALLOC(int,numvars);
+    used = ALLOC(int,info->numvars);
     if (used == NULL) {
-        table->errorCode = CUDD_MEMORY_OUT;
-        return(0);
+	table->errorCode = CUDD_MEMORY_OUT;
+	return(0);
     }
 #if 0
 #ifdef DD_STATS
     (void) fprintf(table->out,"Initial population before sifting\n");
     for (i = 0; i < 2; i++) {
-        for (j = 0; j < numvars; j++) {
-            (void) fprintf(table->out," %2d",STOREDD(i,j));
-        }
-        (void) fprintf(table->out,"\n");
+	for (j = 0; j < numvars; j++) {
+	    (void) fprintf(table->out," %2d",STOREDD(i,j));
+	}
+	(void) fprintf(table->out,"\n");
     }
 #endif
 #endif
-    for (i = 2; i < popsize; i++) {
-        for (j = 0; j < numvars; j++) {
-            used[j] = 0;
-        }
-        /* Generate a permutation of {0...numvars-1} and use it to
-        ** permute the variables in the layesr from lower to upper.
-        */
-        for (j = 0; j < numvars; j++) {
-            do {
-                next = rand_int(numvars-1);
-            } while (used[next] != 0);
-            used[next] = 1;
-            STOREDD(i,j) = table->invperm[next+lower];
-        }
+    for (i = 2; i < info->popsize; i++) {
+       	for (j = 0; j < info->numvars; j++) {
+	    used[j] = 0;
+	}
+	/* Generate a permutation of {0...numvars-1} and use it to
+	** permute the variables in the layesr from lower to upper.
+	*/
+       	for (j = 0; j < info->numvars; j++) {
+	    do {
+		next = rand_int(table,info->numvars-1);
+	    } while (used[next] != 0);
+	    used[next] = 1;
+	    STOREDD(info,i,j) = table->invperm[next+lower];
+       	}
 #if 0
 #ifdef DD_STATS
-        /* Print the order just generated. */
-        for (j = 0; j < numvars; j++) {
-            (void) fprintf(table->out," %2d",STOREDD(i,j));
-        }
-        (void) fprintf(table->out,"\n");
+	/* Print the order just generated. */
+	for (j = 0; j < numvars; j++) {
+	    (void) fprintf(table->out," %2d",STOREDD(i,j));
+	}
+	(void) fprintf(table->out,"\n");
 #endif
 #endif
     }
-    ABC_FREE(used);
+    FREE(used);
     return(1);
 
 } /* end of make_random */
 
 
-/**Function********************************************************************
+/**
+  @brief Moves one variable up.
 
-  Synopsis    [Moves one variable up.]
+  @details Takes a variable from position x and sifts it up to
+  position x_low;  x_low should be less than x.
 
-  Description [Takes a variable from position x and sifts it up to
-  position x_low;  x_low should be less than x. Returns 1 if successful;
-  0 otherwise]
+  @return 1 if successful; 0 otherwise
 
-  SideEffects [None]
+  @sideeffect None
 
-  SeeAlso     []
-
-******************************************************************************/
+*/
 static int
 sift_up(
   DdManager * table,
@@ -516,298 +498,272 @@ sift_up(
 
     y = cuddNextLow(table,x);
     while (y >= x_low) {
-        size = cuddSwapInPlace(table,y,x);
-        if (size == 0) {
-            return(0);
-        }
-        x = y;
-        y = cuddNextLow(table,x);
+	size = cuddSwapInPlace(table,y,x);
+	if (size == 0) {
+	    return(0);
+	}
+	x = y;
+	y = cuddNextLow(table,x);
     }
     return(1);
 
 } /* end of sift_up */
 
 
-/**Function********************************************************************
+/**
+  @brief Builds a %DD from a given order.
 
-  Synopsis [Builds a DD from a given order.]
+  @details This procedure also sifts the final order and inserts into
+  the array the size in nodes of the result.
 
-  Description [Builds a DD from a given order.  This procedure also
-  sifts the final order and inserts into the array the size in nodes
-  of the result. Returns 1 if successful; 0 otherwise.]
+  @return 1 if successful; 0 otherwise.
 
-  SideEffects [None]
+  @sideeffect None
 
-  SeeAlso     []
-
-******************************************************************************/
+*/
 static int
 build_dd(
   DdManager * table,
   int  num /* the index of the individual to be built */,
   int  lower,
-  int  upper)
+  int  upper,
+  GeneticInfo_t * info)
 {
-    int         i,j;            /* loop vars */
-    int         position;
-    int         index;
-    int         limit;          /* how large the DD for this order can grow */
-    int         size;
+    int 	i,j;		/* loop vars */
+    int 	position;
+    int		index;
+    int		limit;		/* how large the DD for this order can grow */
+    int		size;
 
     /* Check the computed table. If the order already exists, it
     ** suffices to copy the size from the existing entry.
     */
-    if (computed && st__lookup_int(computed,(char *)&STOREDD(num,0),&index)) {
-        STOREDD(num,numvars) = STOREDD(index,numvars);
+    if (info->computed &&
+        st__lookup_int(info->computed,&STOREDD(info,num,0),&index)) {
+	STOREDD(info,num,info->numvars) = STOREDD(info,index,info->numvars);
 #ifdef DD_STATS
-        (void) fprintf(table->out,"\nCache hit for index %d", index);
+	(void) fprintf(table->out,"\nCache hit for index %d", index);
 #endif
-        return(1);
+	return(1);
     }
 
     /* Stop if the DD grows 20 times larges than the reference size. */
-    limit = 20 * STOREDD(0,numvars);
+    limit = 20 * STOREDD(info,0,info->numvars);
 
     /* Sift up the variables so as to build the desired permutation.
     ** First the variable that has to be on top is sifted to the top.
     ** Then the variable that has to occupy the secon position is sifted
     ** up to the second position, and so on.
     */
-    for (j = 0; j < numvars; j++) {
-        i = STOREDD(num,j);
-        position = table->perm[i];
-        result = sift_up(table,position,j+lower);
-        if (!result) return(0);
-        size = table->keys - table->isolated;
-        if (size > limit) break;
+    for (j = 0; j < info->numvars; j++) {
+	i = STOREDD(info,num,j);
+	position = table->perm[i];
+	info->result = sift_up(table,position,j+lower);
+	if (!info->result) return(0);
+	size = (int) (table->keys - table->isolated);
+	if (size > limit) break;
     }
 
     /* Sift the DD just built. */
 #ifdef DD_STATS
     (void) fprintf(table->out,"\n");
 #endif
-    result = cuddSifting(table,lower,upper);
-    if (!result) return(0);
+    info->result = cuddSifting(table,lower,upper);
+    if (!info->result) return(0);
 
     /* Copy order and size to table. */
-    for (j = 0; j < numvars; j++) {
-        STOREDD(num,j) = table->invperm[lower+j];
+    for (j = 0; j < info->numvars; j++) {
+	STOREDD(info,num,j) = table->invperm[lower+j];
     }
-    STOREDD(num,numvars) = table->keys - table->isolated; /* size of new DD */
+    STOREDD(info,num,info->numvars) = (int) (table->keys - table->isolated); /* size of new DD */
     return(1);
 
 } /* end of build_dd */
 
 
-/**Function********************************************************************
+/**
+  @brief Finds the largest %DD in the population.
 
-  Synopsis    [Finds the largest DD in the population.]
+  @details If an order is repeated, it avoids choosing the copy that
+  is in the computed table (it has repeat[i > 1).]
 
-  Description [Finds the largest DD in the population. If an order is
-  repeated, it avoids choosing the copy that is in the computed table
-  (it has repeat[i] > 1).]
+  @sideeffect None
 
-  SideEffects [None]
-
-  SeeAlso     []
-
-******************************************************************************/
+*/
 static int
-largest(void)
+largest(GeneticInfo_t * info)
 {
-    int i;      /* loop var */
-    int big;    /* temporary holder to return result */
+    int i;	/* loop var */
+    int big;	/* temporary holder to return result */
 
     big = 0;
-    while (repeat[big] > 1) big++;
-    for (i = big + 1; i < popsize; i++) {
-        if (STOREDD(i,numvars) >= STOREDD(big,numvars) && repeat[i] <= 1) {
-            big = i;
-        }
+    while (info->repeat[big] > 1) big++;
+    for (i = big + 1; i < info->popsize; i++) {
+	if (STOREDD(info,i,info->numvars) >=
+            STOREDD(info,big,info->numvars) && info->repeat[i] <= 1) {
+	    big = i;
+	}
     }
     return(big);
 
 } /* end of largest */
 
 
-/**Function********************************************************************
+/**
+  @brief Generates a random number between 0 and the integer a.
 
-  Synopsis    [Generates a random number between 0 and the integer a.]
+  @sideeffect None
 
-  Description []
-
-  SideEffects [None]
-
-  SeeAlso     []
-
-******************************************************************************/
+*/
 static int
 rand_int(
+  DdManager *dd,
   int  a)
 {
-    return(Cudd_Random() % (a+1));
+    return(Cudd_Random(dd) % (a+1));
 
 } /* end of rand_int */
 
 
-/**Function********************************************************************
+/**
+  @brief Hash function for the computed table.
 
-  Synopsis    [Hash function for the computed table.]
+  @return the bucket number.
 
-  Description [Hash function for the computed table. Returns the bucket
-  number.]
+  @sideeffect None
 
-  SideEffects [None]
-
-  SeeAlso     []
-
-******************************************************************************/
+*/
 static int
 array_hash(
-  const char * array,
-  int  modulus)
+  char const * array,
+  int modulus,
+  char const * arg)
 {
     int val = 0;
     int i;
-    int *intarray;
-
-    intarray = (int *) array;
+    int const *intarray = (int const *) array;
+    int const numvars = (int const)(ptrint const) arg;
 
     for (i = 0; i < numvars; i++) {
-        val = val * 997 + intarray[i];
+	val = val * 997 + intarray[i];
     }
 
-    return ((val < 0) ? -val : val) % modulus;
+    return(((val < 0) ? -val : val) % modulus);
 
 } /* end of array_hash */
 
 
-/**Function********************************************************************
+/**
+  @brief Comparison function for the computed table.
 
-  Synopsis    [Comparison function for the computed table.]
+  @return 0 if the two arrays are equal; 1 otherwise.
 
-  Description [Comparison function for the computed table. Returns 0 if
-  the two arrays are equal; 1 otherwise.]
+  @sideeffect None
 
-  SideEffects [None]
-
-  SeeAlso     []
-
-******************************************************************************/
+*/
 static int
 array_compare(
-  const char * array1,
-  const char * array2)
+  char const * array1,
+  char const * array2,
+  char const * arg)
 {
     int i;
-    int *intarray1, *intarray2;
-
-    intarray1 = (int *) array1;
-    intarray2 = (int *) array2;
+    int const *intarray1 = (int const *) array1;
+    int const *intarray2 = (int const *) array2;
+    int const numvars = (int const)(ptrint const) arg;
 
     for (i = 0; i < numvars; i++) {
-        if (intarray1[i] != intarray2[i]) return(1);
+	if (intarray1[i] != intarray2[i]) return(1);
     }
     return(0);
 
 } /* end of array_compare */
 
 
-/**Function********************************************************************
+/**
+  @brief Returns the index of the fittest individual.
 
-  Synopsis    [Returns the index of the fittest individual.]
+  @sideeffect None
 
-  Description []
-
-  SideEffects [None]
-
-  SeeAlso     []
-
-******************************************************************************/
+*/
 static int
-find_best(void)
+find_best(GeneticInfo_t * info)
 {
     int i,small;
 
     small = 0;
-    for (i = 1; i < popsize; i++) {
-        if (STOREDD(i,numvars) < STOREDD(small,numvars)) {
-            small = i;
-        }
+    for (i = 1; i < info->popsize; i++) {
+	if (STOREDD(info,i,info->numvars) < STOREDD(info,small,info->numvars)) {
+	    small = i;
+	}
     }
     return(small);
 
 } /* end of find_best */
 
 
-/**Function********************************************************************
+/**
+  @brief Returns the average fitness of the population.
 
-  Synopsis    [Returns the average fitness of the population.]
+  @sideeffect None
 
-  Description []
-
-  SideEffects [None]
-
-  SeeAlso     []
-
-******************************************************************************/
+*/
 #ifdef DD_STATS
 static double
-find_average_fitness(void)
+find_average_fitness(GeneticInfo_t * info)
 {
     int i;
     int total_fitness = 0;
     double average_fitness;
 
-    for (i = 0; i < popsize; i++) {
-        total_fitness += STOREDD(i,numvars);
+    for (i = 0; i < info->popsize; i++) {
+	total_fitness += STOREDD(info,i,info->numvars);
     }
-    average_fitness = (double) total_fitness / (double) popsize;
+    average_fitness = (double) total_fitness / (double) info->popsize;
     return(average_fitness);
 
 } /* end of find_average_fitness */
 #endif
 
 
-/**Function********************************************************************
+/**
+  @brief Performs the crossover between two parents.
 
-  Synopsis [Performs the crossover between two parents.]
-
-  Description [Performs the crossover between two randomly chosen
+  @details Performs the crossover between two randomly chosen
   parents, and creates two children, x1 and x2. Uses the Partially
-  Matched Crossover operator.]
+  Matched Crossover operator.
 
-  SideEffects [None]
+  @sideeffect None
 
-  SeeAlso     []
-
-******************************************************************************/
+*/
 static int
 PMX(
-  int  maxvar)
+  DdManager * dd,
+  int  maxvar,
+  GeneticInfo_t * info)
 {
-    int         cut1,cut2;      /* the two cut positions (random) */
-    int         mom,dad;        /* the two randomly chosen parents */
-    int         *inv1;          /* inverse permutations for repair algo */
-    int         *inv2;
-    int         i;              /* loop vars */
-    int         u,v;            /* aux vars */
+    int 	cut1,cut2;	/* the two cut positions (random) */
+    int 	mom,dad;	/* the two randomly chosen parents */
+    int		*inv1;		/* inverse permutations for repair algo */
+    int		*inv2;
+    int 	i;		/* loop vars */
+    int		u,v;		/* aux vars */
 
-    inv1 = ABC_ALLOC(int,maxvar);
+    inv1 = ALLOC(int,maxvar);
     if (inv1 == NULL) {
-        return(0);
+	return(0);
     }
-    inv2 = ABC_ALLOC(int,maxvar);
+    inv2 = ALLOC(int,maxvar);
     if (inv2 == NULL) {
-        ABC_FREE(inv1);
-        return(0);
+	FREE(inv1);
+	return(0);
     }
 
     /* Choose two orders from the population using roulette wheel. */
-    if (!roulette(&mom,&dad)) {
-        ABC_FREE(inv1);
-        ABC_FREE(inv2);
-        return(0);
+    if (!roulette(dd,&mom,&dad,info)) {
+	FREE(inv1);
+	FREE(inv2);
+	return(0);
     }
 
     /* Choose two random cut positions. A cut in position i means that
@@ -815,123 +771,120 @@ PMX(
     ** exchange the middle of the two orderings; otherwise, we
     ** exchange the beginnings and the ends.
     */
-    cut1 = rand_int(numvars-1);
+    cut1 = rand_int(dd,info->numvars-1);
     do {
-        cut2 = rand_int(numvars-1);
+	cut2 = rand_int(dd,info->numvars-1);
     } while (cut1 == cut2);
 
 #if 0
     /* Print out the parents. */
-    (void) fprintf(table->out,
-                   "Crossover of %d (mom) and %d (dad) between %d and %d\n",
-                   mom,dad,cut1,cut2);
-    for (i = 0; i < numvars; i++) {
-        if (i == cut1 || i == cut2) (void) fprintf(table->out,"|");
-        (void) fprintf(table->out,"%2d ",STOREDD(mom,i));
+    (void) fprintf(dd->out,
+		   "Crossover of %d (mom) and %d (dad) between %d and %d\n",
+		   mom,dad,cut1,cut2);
+    for (i = 0; i < info->numvars; i++) {
+	if (i == cut1 || i == cut2) (void) fprintf(dd->out,"|");
+	(void) fprintf(dd->out,"%2d ",STOREDD(info,mom,i));
     }
-    (void) fprintf(table->out,"\n");
-    for (i = 0; i < numvars; i++) {
-        if (i == cut1 || i == cut2) (void) fprintf(table->out,"|");
-        (void) fprintf(table->out,"%2d ",STOREDD(dad,i));
+    (void) fprintf(dd->out,"\n");
+    for (i = 0; i < info->numvars; i++) {
+	if (i == cut1 || i == cut2) (void) fprintf(dd->out,"|");
+	(void) fprintf(dd->out,"%2d ",STOREDD(info,dad,i));
     }
-    (void) fprintf(table->out,"\n");
+    (void) fprintf(dd->out,"\n");
 #endif
 
     /* Initialize the inverse permutations: -1 means yet undetermined. */
     for (i = 0; i < maxvar; i++) {
-        inv1[i] = -1;
-        inv2[i] = -1;
+	inv1[i] = -1;
+	inv2[i] = -1;
     }
 
     /* Copy the portions whithin the cuts. */
-    for (i = cut1; i != cut2; i = (i == numvars-1) ? 0 : i+1) {
-        STOREDD(popsize,i) = STOREDD(dad,i);
-        inv1[STOREDD(popsize,i)] = i;
-        STOREDD(popsize+1,i) = STOREDD(mom,i);
-        inv2[STOREDD(popsize+1,i)] = i;
+    for (i = cut1; i != cut2; i = (i == info->numvars-1) ? 0 : i+1) {
+	STOREDD(info,info->popsize,i) = STOREDD(info,dad,i);
+	inv1[STOREDD(info,info->popsize,i)] = i;
+	STOREDD(info,info->popsize+1,i) = STOREDD(info,mom,i);
+	inv2[STOREDD(info,info->popsize+1,i)] = i;
     }
 
     /* Now apply the repair algorithm outside the cuts. */
-    for (i = cut2; i != cut1; i = (i == numvars-1 ) ? 0 : i+1) {
-        v = i;
-        do {
-            u = STOREDD(mom,v);
-            v = inv1[u];
-        } while (v != -1);
-        STOREDD(popsize,i) = u;
-        inv1[u] = i;
-        v = i;
-        do {
-            u = STOREDD(dad,v);
-            v = inv2[u];
-        } while (v != -1);
-        STOREDD(popsize+1,i) = u;
-        inv2[u] = i;
+    for (i = cut2; i != cut1; i = (i == info->numvars-1 ) ? 0 : i+1) {
+	v = i;
+	do {
+	    u = STOREDD(info,mom,v);
+	    v = inv1[u];
+	} while (v != -1);
+	STOREDD(info,info->popsize,i) = u;
+	inv1[u] = i;
+	v = i;
+	do {
+	    u = STOREDD(info,dad,v);
+	    v = inv2[u];
+	} while (v != -1);
+	STOREDD(info,info->popsize+1,i) = u;
+	inv2[u] = i;
     }
 
 #if 0
     /* Print the results of crossover. */
-    for (i = 0; i < numvars; i++) {
-        if (i == cut1 || i == cut2) (void) fprintf(table->out,"|");
-        (void) fprintf(table->out,"%2d ",STOREDD(popsize,i));
+    for (i = 0; i < info->numvars; i++) {
+	if (i == cut1 || i == cut2) (void) fprintf(table->out,"|");
+	(void) fprintf(table->out,"%2d ",STOREDD(info,info->popsize,i));
     }
     (void) fprintf(table->out,"\n");
-    for (i = 0; i < numvars; i++) {
-        if (i == cut1 || i == cut2) (void) fprintf(table->out,"|");
-        (void) fprintf(table->out,"%2d ",STOREDD(popsize+1,i));
+    for (i = 0; i < info->numvars; i++) {
+	if (i == cut1 || i == cut2) (void) fprintf(table->out,"|");
+	(void) fprintf(table->out,"%2d ",STOREDD(info,info->popsize+1,i));
     }
     (void) fprintf(table->out,"\n");
 #endif
 
-    ABC_FREE(inv1);
-    ABC_FREE(inv2);
+    FREE(inv1);
+    FREE(inv2);
     return(1);
 
 } /* end of PMX */
 
 
-/**Function********************************************************************
+/**
+  @brief Selects two distinct parents with the roulette wheel method.
 
-  Synopsis    [Selects two parents with the roulette wheel method.]
+  @sideeffect The indices of the selected parents are returned as side
+  effects.
 
-  Description [Selects two distinct parents with the roulette wheel method.]
-
-  SideEffects [The indices of the selected parents are returned as side
-  effects.]
-
-  SeeAlso     []
-
-******************************************************************************/
+*/
 static int
 roulette(
+  DdManager * dd,
   int * p1,
-  int * p2)
+  int * p2,
+  GeneticInfo_t * info)
 {
     double *wheel;
     double spin;
     int i;
 
-    wheel = ABC_ALLOC(double,popsize);
+    wheel = ALLOC(double,info->popsize);
     if (wheel == NULL) {
-        return(0);
+	return(0);
     }
 
     /* The fitness of an individual is the reciprocal of its size. */
-    wheel[0] = 1.0 / (double) STOREDD(0,numvars);
+    wheel[0] = 1.0 / (double) STOREDD(info,0,info->numvars);
 
-    for (i = 1; i < popsize; i++) {
-        wheel[i] = wheel[i-1] + 1.0 / (double) STOREDD(i,numvars);
+    for (i = 1; i < info->popsize; i++) {
+	wheel[i] = wheel[i-1] + 1.0 / (double) STOREDD(info,i,info->numvars);
     }
 
     /* Get a random number between 0 and wheel[popsize-1] (that is,
     ** the sum of all fitness values. 2147483561 is the largest number
     ** returned by Cudd_Random.
     */
-    spin = wheel[numvars-1] * (double) Cudd_Random() / 2147483561.0;
+    spin = wheel[info->numvars-1] * (double) Cudd_Random(dd) / 2147483561.0;
 
     /* Find the lucky element by scanning the wheel. */
-    for (i = 0; i < popsize; i++) {
-        if (spin <= wheel[i]) break;
+    for (i = 0; i < info->popsize; i++) {
+	if (spin <= wheel[i]) break;
     }
     *p1 = i;
 
@@ -939,19 +892,16 @@ roulette(
     ** distinct from the first.
     */
     do {
-        spin = wheel[popsize-1] * (double) Cudd_Random() / 2147483561.0;
-        for (i = 0; i < popsize; i++) {
-            if (spin <= wheel[i]) break;
-        }
+	spin = wheel[info->popsize-1] * (double) Cudd_Random(dd) / 2147483561.0;
+	for (i = 0; i < info->popsize; i++) {
+	    if (spin <= wheel[i]) break;
+	}
     } while (i == *p1);
     *p2 = i;
 
-    ABC_FREE(wheel);
+    FREE(wheel);
     return(1);
 
 } /* end of roulette */
 
-
 ABC_NAMESPACE_IMPL_END
-
-

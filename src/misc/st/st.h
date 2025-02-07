@@ -16,6 +16,7 @@
 #define st__INCLUDED
 
 #include "misc/util/abc_global.h"
+#define NIL(type)		((type *) 0)
 
 ABC_NAMESPACE_HEADER_START
 
@@ -41,6 +42,9 @@ ABC_NAMESPACE_HEADER_START
 typedef int (* st__compare_func_type)(const char*, const char*);
 typedef int (* st__hash_func_type)(const char*, int);
 
+typedef int (* st__compare_func_arg_type)(char const *, char const *, char const *);
+typedef int (* st__hash_func_arg_type)(char const *, int, char const *);
+
 typedef struct st__table_entry st__table_entry;
 struct st__table_entry {
     char *key;
@@ -51,7 +55,10 @@ struct st__table_entry {
 typedef struct st__table st__table;
 struct st__table {
     st__compare_func_type compare;
+    st__compare_func_arg_type compare_arg;
     st__hash_func_type hash;
+    st__hash_func_arg_type hash_arg;
+    char const * arg;
     int num_bins;
     int num_entries;
     int max_density;
@@ -77,6 +84,10 @@ typedef int (* st__PFI)();
 
 extern st__table * st__init_table_with_params ( st__compare_func_type compare, st__hash_func_type hash, int size, int density, double grow_factor, int reorder_flag);
 extern st__table * st__init_table ( st__compare_func_type, st__hash_func_type);
+
+extern st__table * st__init_table_with_params_and_arg (st__compare_func_arg_type, st__hash_func_arg_type, char const * arg, int size, int density, double grow_factor, int reorder_flag);
+extern st__table * st__init_table_with_arg (st__compare_func_arg_type, st__hash_func_arg_type, char const * arg);
+
 extern void st__free_table ( st__table *);
 extern int st__lookup ( st__table *, const char *, char **);
 extern int st__lookup_int ( st__table *, char *, int *);

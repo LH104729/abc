@@ -1,32 +1,14 @@
-/**CFile***********************************************************************
+/**
+  @file
 
-  FileName    [cuddClip.c]
+  @ingroup cudd
 
-  PackageName [cudd]
+  @brief Clipping functions.
 
-  Synopsis    [Clipping functions.]
+  @author Fabio Somenzi
 
-  Description [External procedures included in this module:
-                <ul>
-                <li> Cudd_bddClippingAnd()
-                <li> Cudd_bddClippingAndAbstract()
-                </ul>
-       Internal procedures included in this module:
-                <ul>
-                <li> cuddBddClippingAnd()
-                <li> cuddBddClippingAndAbstract()
-                </ul>
-       Static procedures included in this module:
-                <ul>
-                <li> cuddBddClippingAndRecur()
-                <li> cuddBddClipAndAbsRecur()
-                </ul>
-
-  SeeAlso     []
-
-  Author      [Fabio Somenzi]
-
-  Copyright   [Copyright (c) 1995-2004, Regents of the University of Colorado
+  @copyright@parblock
+  Copyright (c) 1995-2015, Regents of the University of Colorado
 
   All rights reserved.
 
@@ -56,18 +38,15 @@
   CAUSED AND ON ANY THEORY OF LIABILITY, WHETHER IN CONTRACT, STRICT
   LIABILITY, OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN
   ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE
-  POSSIBILITY OF SUCH DAMAGE.]
+  POSSIBILITY OF SUCH DAMAGE.
+  @endparblock
 
-******************************************************************************/
+*/
 
 #include "misc/util/util_hack.h"
 #include "cuddInt.h"
 
 ABC_NAMESPACE_IMPL_START
-
-
-
-
 /*---------------------------------------------------------------------------*/
 /* Constant declarations                                                     */
 /*---------------------------------------------------------------------------*/
@@ -86,16 +65,12 @@ ABC_NAMESPACE_IMPL_START
 /* Variable declarations                                                     */
 /*---------------------------------------------------------------------------*/
 
-#ifndef lint
-static char rcsid[] DD_UNUSED = "$Id: cuddClip.c,v 1.8 2004/08/13 18:04:47 fabio Exp $";
-#endif
 
 /*---------------------------------------------------------------------------*/
 /* Macro declarations                                                        */
 /*---------------------------------------------------------------------------*/
 
-
-/**AutomaticStart*************************************************************/
+/** \cond */
 
 /*---------------------------------------------------------------------------*/
 /* Static function prototypes                                                */
@@ -104,7 +79,7 @@ static char rcsid[] DD_UNUSED = "$Id: cuddClip.c,v 1.8 2004/08/13 18:04:47 fabio
 static DdNode * cuddBddClippingAndRecur (DdManager *manager, DdNode *f, DdNode *g, int distance, int direction);
 static DdNode * cuddBddClipAndAbsRecur (DdManager *manager, DdNode *f, DdNode *g, DdNode *cube, int distance, int direction);
 
-/**AutomaticEnd***************************************************************/
+/** \endcond */
 
 
 /*---------------------------------------------------------------------------*/
@@ -112,68 +87,71 @@ static DdNode * cuddBddClipAndAbsRecur (DdManager *manager, DdNode *f, DdNode *g
 /*---------------------------------------------------------------------------*/
 
 
-/**Function********************************************************************
+/**
+  @brief Approximates the conjunction of two BDDs f and g.
 
-  Synopsis    [Approximates the conjunction of two BDDs f and g.]
+  @return a pointer to the resulting %BDD if successful; NULL if the
+  intermediate result blows up.
 
-  Description [Approximates the conjunction of two BDDs f and g. Returns a
-  pointer to the resulting BDD if successful; NULL if the intermediate
-  result blows up.]
+  @sideeffect None
 
-  SideEffects [None]
+  @see Cudd_bddAnd
 
-  SeeAlso     [Cudd_bddAnd]
-
-******************************************************************************/
+*/
 DdNode *
 Cudd_bddClippingAnd(
-  DdManager * dd /* manager */,
-  DdNode * f /* first conjunct */,
-  DdNode * g /* second conjunct */,
-  int  maxDepth /* maximum recursion depth */,
-  int  direction /* under (0) or over (1) approximation */)
+  DdManager * dd /**< manager */,
+  DdNode * f /**< first conjunct */,
+  DdNode * g /**< second conjunct */,
+  int  maxDepth /**< maximum recursion depth */,
+  int  direction /**< under (0) or over (1) approximation */)
 {
     DdNode *res;
 
     do {
-        dd->reordered = 0;
-        res = cuddBddClippingAnd(dd,f,g,maxDepth,direction);
+	dd->reordered = 0;
+	res = cuddBddClippingAnd(dd,f,g,maxDepth,direction);
     } while (dd->reordered == 1);
+    if (dd->errorCode == CUDD_TIMEOUT_EXPIRED && dd->timeoutHandler) {
+        dd->timeoutHandler(dd, dd->tohArg);
+    }
     return(res);
 
 } /* end of Cudd_bddClippingAnd */
 
 
-/**Function********************************************************************
+/**
+  @brief Approximates the conjunction of two BDDs f and g and
+  simultaneously abstracts the variables in cube.
 
-  Synopsis    [Approximates the conjunction of two BDDs f and g and
-  simultaneously abstracts the variables in cube.]
+  @details The variables are existentially abstracted.
 
-  Description [Approximates the conjunction of two BDDs f and g and
-  simultaneously abstracts the variables in cube. The variables are
-  existentially abstracted. Returns a pointer to the resulting BDD if
-  successful; NULL if the intermediate result blows up.]
+  @return a pointer to the resulting %BDD if successful; NULL if the
+  intermediate result blows up.
 
-  SideEffects [None]
+  @sideeffect None
 
-  SeeAlso     [Cudd_bddAndAbstract Cudd_bddClippingAnd]
+  @see Cudd_bddAndAbstract Cudd_bddClippingAnd
 
-******************************************************************************/
+*/
 DdNode *
 Cudd_bddClippingAndAbstract(
-  DdManager * dd /* manager */,
-  DdNode * f /* first conjunct */,
-  DdNode * g /* second conjunct */,
-  DdNode * cube /* cube of variables to be abstracted */,
-  int  maxDepth /* maximum recursion depth */,
-  int  direction /* under (0) or over (1) approximation */)
+  DdManager * dd /**< manager */,
+  DdNode * f /**< first conjunct */,
+  DdNode * g /**< second conjunct */,
+  DdNode * cube /**< cube of variables to be abstracted */,
+  int  maxDepth /**< maximum recursion depth */,
+  int  direction /**< under (0) or over (1) approximation */)
 {
     DdNode *res;
 
     do {
-        dd->reordered = 0;
-        res = cuddBddClippingAndAbstract(dd,f,g,cube,maxDepth,direction);
+	dd->reordered = 0;
+	res = cuddBddClippingAndAbstract(dd,f,g,cube,maxDepth,direction);
     } while (dd->reordered == 1);
+    if (dd->errorCode == CUDD_TIMEOUT_EXPIRED && dd->timeoutHandler) {
+        dd->timeoutHandler(dd, dd->tohArg);
+    }
     return(res);
 
 } /* end of Cudd_bddClippingAndAbstract */
@@ -184,26 +162,24 @@ Cudd_bddClippingAndAbstract(
 /*---------------------------------------------------------------------------*/
 
 
-/**Function********************************************************************
+/**
+  @brief Approximates the conjunction of two BDDs f and g.
 
-  Synopsis    [Approximates the conjunction of two BDDs f and g.]
+  @return a pointer to the resulting %BDD if successful; NULL if the
+  intermediate result blows up.
 
-  Description [Approximates the conjunction of two BDDs f and g. Returns a
-  pointer to the resulting BDD if successful; NULL if the intermediate
-  result blows up.]
+  @sideeffect None
 
-  SideEffects [None]
+  @see Cudd_bddClippingAnd
 
-  SeeAlso     [Cudd_bddClippingAnd]
-
-******************************************************************************/
+*/
 DdNode *
 cuddBddClippingAnd(
-  DdManager * dd /* manager */,
-  DdNode * f /* first conjunct */,
-  DdNode * g /* second conjunct */,
-  int  maxDepth /* maximum recursion depth */,
-  int  direction /* under (0) or over (1) approximation */)
+  DdManager * dd /**< manager */,
+  DdNode * f /**< first conjunct */,
+  DdNode * g /**< second conjunct */,
+  int  maxDepth /**< maximum recursion depth */,
+  int  direction /**< under (0) or over (1) approximation */)
 {
     DdNode *res;
 
@@ -214,29 +190,26 @@ cuddBddClippingAnd(
 } /* end of cuddBddClippingAnd */
 
 
-/**Function********************************************************************
+/**
+  @brief Approximates the conjunction of two BDDs f and g and
+  simultaneously abstracts the variables in cube.
 
-  Synopsis    [Approximates the conjunction of two BDDs f and g and
-  simultaneously abstracts the variables in cube.]
+  @return a pointer to the resulting %BDD if successful; NULL if the
+  intermediate result blows up.
 
-  Description [Approximates the conjunction of two BDDs f and g and
-  simultaneously abstracts the variables in cube. Returns a
-  pointer to the resulting BDD if successful; NULL if the intermediate
-  result blows up.]
+  @sideeffect None
 
-  SideEffects [None]
+  @see Cudd_bddClippingAndAbstract
 
-  SeeAlso     [Cudd_bddClippingAndAbstract]
-
-******************************************************************************/
+*/
 DdNode *
 cuddBddClippingAndAbstract(
-  DdManager * dd /* manager */,
-  DdNode * f /* first conjunct */,
-  DdNode * g /* second conjunct */,
-  DdNode * cube /* cube of variables to be abstracted */,
-  int  maxDepth /* maximum recursion depth */,
-  int  direction /* under (0) or over (1) approximation */)
+  DdManager * dd /**< manager */,
+  DdNode * f /**< first conjunct */,
+  DdNode * g /**< second conjunct */,
+  DdNode * cube /**< cube of variables to be abstracted */,
+  int  maxDepth /**< maximum recursion depth */,
+  int  direction /**< under (0) or over (1) approximation */)
 {
     DdNode *res;
 
@@ -250,49 +223,20 @@ cuddBddClippingAndAbstract(
 /*---------------------------------------------------------------------------*/
 /* Definition of static functions                                            */
 /*---------------------------------------------------------------------------*/
-#ifdef USE_CASH_DUMMY
-/**Function********************************************************************
-
-  Synopsis    We need to declare a function passed to cuddCacheLookup2 that can
-              be casted to DD_CTFP.
-
-******************************************************************************/
-static DdNode *
-Cudd_bddClippingAnd_dummy(DdManager *dd, DdNode *f, DdNode *g)
-{
-  assert(0);
-  return 0;
-}
 
 
-/**Function********************************************************************
+/**
+  @brief Implements the recursive step of Cudd_bddClippingAnd.
 
-  Synopsis    We need to declare a function passed to cuddCacheLookup2 that can
-              be casted to DD_CTFP.
+  @details Takes the conjunction of two BDDs.
 
-******************************************************************************/
-static DdNode *
-cuddBddClippingAnd_dummy(DdManager *dd, DdNode *f, DdNode *g)
-{
-  assert(0);
-  return 0;
-}
-#endif
+  @return a pointer to the result is successful; NULL otherwise.
 
+  @sideeffect None
 
-/**Function********************************************************************
+  @see cuddBddClippingAnd
 
-  Synopsis [Implements the recursive step of Cudd_bddClippingAnd.]
-
-  Description [Implements the recursive step of Cudd_bddClippingAnd by taking
-  the conjunction of two BDDs.  Returns a pointer to the result is
-  successful; NULL otherwise.]
-
-  SideEffects [None]
-
-  SeeAlso     [cuddBddClippingAnd]
-
-******************************************************************************/
+*/
 static DdNode *
 cuddBddClippingAndRecur(
   DdManager * manager,
@@ -303,7 +247,8 @@ cuddBddClippingAndRecur(
 {
     DdNode *F, *ft, *fe, *G, *gt, *ge;
     DdNode *one, *zero, *r, *t, *e;
-    unsigned int topf, topg, index;
+    int topf, topg;
+    unsigned int index;
     DD_CTFP cacheOp;
 
     statLine(manager);
@@ -315,15 +260,15 @@ cuddBddClippingAndRecur(
     if (f == g || g == one) return(f);
     if (f == one) return(g);
     if (distance == 0) {
-        /* One last attempt at returning the right result. We sort of
-        ** cheat by calling Cudd_bddLeq. */
-        if (Cudd_bddLeq(manager,f,g)) return(f);
-        if (Cudd_bddLeq(manager,g,f)) return(g);
-        if (direction == 1) {
-            if (Cudd_bddLeq(manager,f,Cudd_Not(g)) ||
-                Cudd_bddLeq(manager,g,Cudd_Not(f))) return(zero);
-        }
-        return(Cudd_NotCond(one,(direction == 0)));
+	/* One last attempt at returning the right result. We sort of
+	** cheat by calling Cudd_bddLeq. */
+	if (Cudd_bddLeq(manager,f,g)) return(f);
+	if (Cudd_bddLeq(manager,g,f)) return(g);
+	if (direction == 1) {
+	    if (Cudd_bddLeq(manager,f,Cudd_Not(g)) ||
+		Cudd_bddLeq(manager,g,Cudd_Not(f))) return(zero);
+	}
+	return(Cudd_NotCond(one,(direction == 0)));
     }
 
     /* At this point f and g are not constant. */
@@ -332,21 +277,19 @@ cuddBddClippingAndRecur(
     /* Check cache. Try to increase cache efficiency by sorting the
     ** pointers. */
     if (f > g) {
-        DdNode *tmp = f;
-        f = g; g = tmp;
+	DdNode *tmp = f;
+	f = g; g = tmp;
     }
     F = Cudd_Regular(f);
     G = Cudd_Regular(g);
-#ifdef USE_CASH_DUMMY
-    cacheOp = (DD_CTFP) (direction ? Cudd_bddClippingAnd_dummy : cuddBddClippingAnd_dummy);
-#else
     cacheOp = (DD_CTFP)
-        (direction ? Cudd_bddClippingAnd : cuddBddClippingAnd);
-#endif
+	(direction ? Cudd_bddClippingAnd : cuddBddClippingAnd);
     if (F->ref != 1 || G->ref != 1) {
-        r = cuddCacheLookup2(manager, cacheOp, f, g);
-        if (r != NULL) return(r);
+	r = cuddCacheLookup2(manager, cacheOp, f, g);
+	if (r != NULL) return(r);
     }
+
+    checkWhetherToGiveUp(manager);
 
     /* Here we can skip the use of cuddI, because the operands are known
     ** to be non-constant.
@@ -356,27 +299,27 @@ cuddBddClippingAndRecur(
 
     /* Compute cofactors. */
     if (topf <= topg) {
-        index = F->index;
-        ft = cuddT(F);
-        fe = cuddE(F);
-        if (Cudd_IsComplement(f)) {
-            ft = Cudd_Not(ft);
-            fe = Cudd_Not(fe);
-        }
+	index = F->index;
+	ft = cuddT(F);
+	fe = cuddE(F);
+	if (Cudd_IsComplement(f)) {
+	    ft = Cudd_Not(ft);
+	    fe = Cudd_Not(fe);
+	}
     } else {
-        index = G->index;
-        ft = fe = f;
+	index = G->index;
+	ft = fe = f;
     }
 
     if (topg <= topf) {
-        gt = cuddT(G);
-        ge = cuddE(G);
-        if (Cudd_IsComplement(g)) {
-            gt = Cudd_Not(gt);
-            ge = Cudd_Not(ge);
-        }
+	gt = cuddT(G);
+	ge = cuddE(G);
+	if (Cudd_IsComplement(g)) {
+	    gt = Cudd_Not(gt);
+	    ge = Cudd_Not(ge);
+	}
     } else {
-        gt = ge = g;
+	gt = ge = g;
     }
 
     t = cuddBddClippingAndRecur(manager, ft, gt, distance, direction);
@@ -384,55 +327,53 @@ cuddBddClippingAndRecur(
     cuddRef(t);
     e = cuddBddClippingAndRecur(manager, fe, ge, distance, direction);
     if (e == NULL) {
-        Cudd_RecursiveDeref(manager, t);
-        return(NULL);
+	Cudd_RecursiveDeref(manager, t);
+	return(NULL);
     }
     cuddRef(e);
 
     if (t == e) {
-        r = t;
+	r = t;
     } else {
-        if (Cudd_IsComplement(t)) {
-            r = cuddUniqueInter(manager,(int)index,Cudd_Not(t),Cudd_Not(e));
-            if (r == NULL) {
-                Cudd_RecursiveDeref(manager, t);
-                Cudd_RecursiveDeref(manager, e);
-                return(NULL);
-            }
-            r = Cudd_Not(r);
-        } else {
-            r = cuddUniqueInter(manager,(int)index,t,e);
-            if (r == NULL) {
-                Cudd_RecursiveDeref(manager, t);
-                Cudd_RecursiveDeref(manager, e);
-                return(NULL);
-            }
-        }
+	if (Cudd_IsComplement(t)) {
+	    r = cuddUniqueInter(manager,(int)index,Cudd_Not(t),Cudd_Not(e));
+	    if (r == NULL) {
+		Cudd_RecursiveDeref(manager, t);
+		Cudd_RecursiveDeref(manager, e);
+		return(NULL);
+	    }
+	    r = Cudd_Not(r);
+	} else {
+	    r = cuddUniqueInter(manager,(int)index,t,e);
+	    if (r == NULL) {
+		Cudd_RecursiveDeref(manager, t);
+		Cudd_RecursiveDeref(manager, e);
+		return(NULL);
+	    }
+	}
     }
     cuddDeref(e);
     cuddDeref(t);
     if (F->ref != 1 || G->ref != 1)
-        cuddCacheInsert2(manager, cacheOp, f, g, r);
+	cuddCacheInsert2(manager, cacheOp, f, g, r);
     return(r);
 
 } /* end of cuddBddClippingAndRecur */
 
 
-/**Function********************************************************************
+/**
+  @brief Approximates the AND of two BDDs and simultaneously abstracts the
+  variables in cube.
 
-  Synopsis [Approximates the AND of two BDDs and simultaneously abstracts the
-  variables in cube.]
+  @details The variables are existentially abstracted.
 
-  Description [Approximates the AND of two BDDs and simultaneously
-  abstracts the variables in cube. The variables are existentially
-  abstracted.  Returns a pointer to the result is successful; NULL
-  otherwise.]
+  @return a pointer to the result is successful; NULL otherwise.
 
-  SideEffects [None]
+  @sideeffect None
 
-  SeeAlso     [Cudd_bddClippingAndAbstract]
+  @see Cudd_bddClippingAndAbstract
 
-******************************************************************************/
+*/
 static DdNode *
 cuddBddClipAndAbsRecur(
   DdManager * manager,
@@ -444,7 +385,8 @@ cuddBddClipAndAbsRecur(
 {
     DdNode *F, *ft, *fe, *G, *gt, *ge;
     DdNode *one, *zero, *r, *t, *e, *Cube;
-    unsigned int topf, topg, topcube, top, index;
+    int topf, topg, topcube, top;
+    unsigned int index;
     ptruint cacheTag;
 
     statLine(manager);
@@ -453,15 +395,15 @@ cuddBddClipAndAbsRecur(
 
     /* Terminal cases. */
     if (f == zero || g == zero || f == Cudd_Not(g)) return(zero);
-    if (f == one && g == one)   return(one);
+    if (f == one && g == one)	return(one);
     if (cube == one) {
-        return(cuddBddClippingAndRecur(manager, f, g, distance, direction));
+	return(cuddBddClippingAndRecur(manager, f, g, distance, direction));
     }
     if (f == one || f == g) {
-        return (cuddBddExistAbstractRecur(manager, g, cube));
+	return (cuddBddExistAbstractRecur(manager, g, cube));
     }
     if (g == one) {
-        return (cuddBddExistAbstractRecur(manager, f, cube));
+	return (cuddBddExistAbstractRecur(manager, f, cube));
     }
     if (distance == 0) return(Cudd_NotCond(one,(direction == 0)));
 
@@ -470,20 +412,22 @@ cuddBddClipAndAbsRecur(
 
     /* Check cache. */
     if (f > g) { /* Try to increase cache efficiency. */
-        DdNode *tmp = f;
-        f = g; g = tmp;
+	DdNode *tmp = f;
+	f = g; g = tmp;
     }
     F = Cudd_Regular(f);
     G = Cudd_Regular(g);
     cacheTag = direction ? DD_BDD_CLIPPING_AND_ABSTRACT_UP_TAG :
-        DD_BDD_CLIPPING_AND_ABSTRACT_DOWN_TAG;
+	DD_BDD_CLIPPING_AND_ABSTRACT_DOWN_TAG;
     if (F->ref != 1 || G->ref != 1) {
-        r = cuddCacheLookup(manager, cacheTag,
-                            f, g, cube);
-        if (r != NULL) {
-            return(r);
-        }
+	r = cuddCacheLookup(manager, cacheTag,
+			    f, g, cube);
+	if (r != NULL) {
+	    return(r);
+	}
     }
+
+    checkWhetherToGiveUp(manager);
 
     /* Here we can skip the use of cuddI, because the operands are known
     ** to be non-constant.
@@ -494,39 +438,39 @@ cuddBddClipAndAbsRecur(
     topcube = manager->perm[cube->index];
 
     if (topcube < top) {
-        return(cuddBddClipAndAbsRecur(manager, f, g, cuddT(cube),
-                                      distance, direction));
+	return(cuddBddClipAndAbsRecur(manager, f, g, cuddT(cube),
+				      distance, direction));
     }
     /* Now, topcube >= top. */
 
     if (topf == top) {
-        index = F->index;
-        ft = cuddT(F);
-        fe = cuddE(F);
-        if (Cudd_IsComplement(f)) {
-            ft = Cudd_Not(ft);
-            fe = Cudd_Not(fe);
-        }
+	index = F->index;
+	ft = cuddT(F);
+	fe = cuddE(F);
+	if (Cudd_IsComplement(f)) {
+	    ft = Cudd_Not(ft);
+	    fe = Cudd_Not(fe);
+	}
     } else {
-        index = G->index;
-        ft = fe = f;
+	index = G->index;
+	ft = fe = f;
     }
 
     if (topg == top) {
-        gt = cuddT(G);
-        ge = cuddE(G);
-        if (Cudd_IsComplement(g)) {
-            gt = Cudd_Not(gt);
-            ge = Cudd_Not(ge);
-        }
+	gt = cuddT(G);
+	ge = cuddE(G);
+	if (Cudd_IsComplement(g)) {
+	    gt = Cudd_Not(gt);
+	    ge = Cudd_Not(ge);
+	}
     } else {
-        gt = ge = g;
+	gt = ge = g;
     }
 
     if (topcube == top) {
-        Cube = cuddT(cube);
+	Cube = cuddT(cube);
     } else {
-        Cube = cube;
+	Cube = cube;
     }
 
     t = cuddBddClipAndAbsRecur(manager, ft, gt, Cube, distance, direction);
@@ -536,63 +480,60 @@ cuddBddClipAndAbsRecur(
     ** the else branch if t is 1.
     */
     if (t == one && topcube == top) {
-        if (F->ref != 1 || G->ref != 1)
-            cuddCacheInsert(manager, cacheTag, f, g, cube, one);
-        return(one);
+	if (F->ref != 1 || G->ref != 1)
+	    cuddCacheInsert(manager, cacheTag, f, g, cube, one);
+	return(one);
     }
     cuddRef(t);
 
     e = cuddBddClipAndAbsRecur(manager, fe, ge, Cube, distance, direction);
     if (e == NULL) {
-        Cudd_RecursiveDeref(manager, t);
-        return(NULL);
+	Cudd_RecursiveDeref(manager, t);
+	return(NULL);
     }
     cuddRef(e);
 
-    if (topcube == top) {       /* abstract */
-        r = cuddBddClippingAndRecur(manager, Cudd_Not(t), Cudd_Not(e),
-                                    distance, (direction == 0));
-        if (r == NULL) {
-            Cudd_RecursiveDeref(manager, t);
-            Cudd_RecursiveDeref(manager, e);
-            return(NULL);
-        }
-        r = Cudd_Not(r);
-        cuddRef(r);
-        Cudd_RecursiveDeref(manager, t);
-        Cudd_RecursiveDeref(manager, e);
-        cuddDeref(r);
+    if (topcube == top) {	/* abstract */
+	r = cuddBddClippingAndRecur(manager, Cudd_Not(t), Cudd_Not(e),
+				    distance, (direction == 0));
+	if (r == NULL) {
+	    Cudd_RecursiveDeref(manager, t);
+	    Cudd_RecursiveDeref(manager, e);
+	    return(NULL);
+	}
+	r = Cudd_Not(r);
+	cuddRef(r);
+	Cudd_RecursiveDeref(manager, t);
+	Cudd_RecursiveDeref(manager, e);
+	cuddDeref(r);
     } else if (t == e) {
-        r = t;
-        cuddDeref(t);
-        cuddDeref(e);
+	r = t;
+	cuddDeref(t);
+	cuddDeref(e);
     } else {
-        if (Cudd_IsComplement(t)) {
-            r = cuddUniqueInter(manager,(int)index,Cudd_Not(t),Cudd_Not(e));
-            if (r == NULL) {
-                Cudd_RecursiveDeref(manager, t);
-                Cudd_RecursiveDeref(manager, e);
-                return(NULL);
-            }
-            r = Cudd_Not(r);
-        } else {
-            r = cuddUniqueInter(manager,(int)index,t,e);
-            if (r == NULL) {
-                Cudd_RecursiveDeref(manager, t);
-                Cudd_RecursiveDeref(manager, e);
-                return(NULL);
-            }
-        }
-        cuddDeref(e);
-        cuddDeref(t);
+	if (Cudd_IsComplement(t)) {
+	    r = cuddUniqueInter(manager,(int)index,Cudd_Not(t),Cudd_Not(e));
+	    if (r == NULL) {
+		Cudd_RecursiveDeref(manager, t);
+		Cudd_RecursiveDeref(manager, e);
+		return(NULL);
+	    }
+	    r = Cudd_Not(r);
+	} else {
+	    r = cuddUniqueInter(manager,(int)index,t,e);
+	    if (r == NULL) {
+		Cudd_RecursiveDeref(manager, t);
+		Cudd_RecursiveDeref(manager, e);
+		return(NULL);
+	    }
+	}
+	cuddDeref(e);
+	cuddDeref(t);
     }
     if (F->ref != 1 || G->ref != 1)
-        cuddCacheInsert(manager, cacheTag, f, g, cube, r);
+	cuddCacheInsert(manager, cacheTag, f, g, cube, r);
     return (r);
 
 } /* end of cuddBddClipAndAbsRecur */
 
-
 ABC_NAMESPACE_IMPL_END
-
-

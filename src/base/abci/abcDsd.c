@@ -660,7 +660,7 @@ Abc_Ntk_t * Abc_NtkSparsifyInternal( Abc_Ntk_t * pNtk, int nPerc, int fVerbose )
         // onset/offset
         for ( c = 0; c < 2; c++ )
         {
-            Cudd_Srandom( 0 );
+            Cudd_Srandom( ddNew, 0 );
             Abc_NtkDupObj( pNtkNew, pDriver, 0 );
             Abc_ObjForEachFanin( pDriver, pFanin, k )
                 Abc_ObjAddFanin( pDriver->pCopy, pFanin->pCopy );

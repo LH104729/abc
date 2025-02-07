@@ -1,5 +1,4 @@
-SRC +=  src/bdd/cudd/cuddAPI.c \
-    src/bdd/cudd/cuddAddAbs.c \
+SRC +=  src/bdd/cudd/cuddAddAbs.c \
     src/bdd/cudd/cuddAddApply.c \
     src/bdd/cudd/cuddAddFind.c \
     src/bdd/cudd/cuddAddInv.c \
@@ -9,6 +8,7 @@ SRC +=  src/bdd/cudd/cuddAPI.c \
     src/bdd/cudd/cuddAndAbs.c \
     src/bdd/cudd/cuddAnneal.c \
     src/bdd/cudd/cuddApa.c \
+    src/bdd/cudd/cuddAPI.c \
     src/bdd/cudd/cuddApprox.c \
     src/bdd/cudd/cuddBddAbs.c \
     src/bdd/cudd/cuddBddCorr.c \
@@ -58,4 +58,4 @@ SRC +=  src/bdd/cudd/cuddAPI.c \
     src/bdd/cudd/cuddZddReord.c \
     src/bdd/cudd/cuddZddSetop.c \
     src/bdd/cudd/cuddZddSymm.c \
-    src/bdd/cudd/cuddZddUtil.c 
+    src/bdd/cudd/cuddZddUtil.c

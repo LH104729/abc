@@ -1,39 +1,14 @@
-/**CFile***********************************************************************
+/**
+  @file
 
-  FileName    [cuddExact.c]
+  @ingroup cudd
 
-  PackageName [cudd]
+  @brief Functions for exact variable reordering.
 
-  Synopsis    [Functions for exact variable reordering.]
+  @author Cheng Hua, Fabio Somenzi
 
-  Description [External procedures included in this file:
-                <ul>
-                </ul>
-        Internal procedures included in this module:
-                <ul>
-                <li> cuddExact()
-                </ul>
-        Static procedures included in this module:
-                <ul>
-                <li> getMaxBinomial()
-                <li> gcd()
-                <li> getMatrix()
-                <li> freeMatrix()
-                <li> getLevelKeys()
-                <li> ddShuffle()
-                <li> ddSiftUp()
-                <li> updateUB()
-                <li> ddCountRoots()
-                <li> ddClearGlobal()
-                <li> computeLB()
-                <li> updateEntry()
-                <li> pushDown()
-                <li> initSymmInfo()
-                </ul>]
-
-  Author      [Cheng Hua, Fabio Somenzi]
-
-  Copyright   [Copyright (c) 1995-2004, Regents of the University of Colorado
+  @copyright@parblock
+  Copyright (c) 1995-2015, Regents of the University of Colorado
 
   All rights reserved.
 
@@ -63,21 +38,18 @@
   CAUSED AND ON ANY THEORY OF LIABILITY, WHETHER IN CONTRACT, STRICT
   LIABILITY, OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN
   ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE
-  POSSIBILITY OF SUCH DAMAGE.]
+  POSSIBILITY OF SUCH DAMAGE.
+  @endparblock
 
-******************************************************************************/
+*/
 
 #include "misc/util/util_hack.h"
 #include "cuddInt.h"
 
 ABC_NAMESPACE_IMPL_START
-
-
-
 /*---------------------------------------------------------------------------*/
 /* Constant declarations                                                     */
 /*---------------------------------------------------------------------------*/
-
 
 /*---------------------------------------------------------------------------*/
 /* Stucture declarations                                                     */
@@ -91,19 +63,11 @@ ABC_NAMESPACE_IMPL_START
 /* Variable declarations                                                     */
 /*---------------------------------------------------------------------------*/
 
-#ifndef lint
-static char rcsid[] DD_UNUSED = "$Id: cuddExact.c,v 1.28 2009/02/19 16:19:19 fabio Exp $";
-#endif
-
-#ifdef DD_STATS
-static int ddTotalShuffles;
-#endif
-
 /*---------------------------------------------------------------------------*/
 /* Macro declarations                                                        */
 /*---------------------------------------------------------------------------*/
 
-/**AutomaticStart*************************************************************/
+/** \cond */
 
 /*---------------------------------------------------------------------------*/
 /* Static function prototypes                                                */
@@ -124,7 +88,7 @@ static void pushDown (DdHalfWord *order, int j, int level);
 static DdHalfWord * initSymmInfo (DdManager *table, int lower, int upper);
 static int checkSymmInfo (DdManager *table, DdHalfWord *symmInfo, int index, int level);
 
-/**AutomaticEnd***************************************************************/
+/** \endcond */
 
 
 /*---------------------------------------------------------------------------*/
@@ -136,19 +100,17 @@ static int checkSymmInfo (DdManager *table, DdHalfWord *symmInfo, int index, int
 /*---------------------------------------------------------------------------*/
 
 
-/**Function********************************************************************
+/**
+  @brief Exact variable ordering algorithm.
 
-  Synopsis    [Exact variable ordering algorithm.]
+  @details Finds an optimum order for the variables between lower and
+  upper.
 
-  Description [Exact variable ordering algorithm. Finds an optimum
-  order for the variables between lower and upper.  Returns 1 if
-  successful; 0 otherwise.]
+  @return 1 if successful; 0 otherwise.
 
-  SideEffects [None]
+  @sideeffect None
 
-  SeeAlso     []
-
-******************************************************************************/
+*/
 int
 cuddExact(
   DdManager * table,
@@ -158,7 +120,7 @@ cuddExact(
     int k, i, j;
     int maxBinomial, oldSubsets, newSubsets;
     int subsetCost;
-    int size;                   /* number of variables to be reordered */
+    int size;			/* number of variables to be reordered */
     int unused, nvars, level, result;
     int upperBound, lowerBound, cost;
     int roots;
@@ -179,13 +141,13 @@ cuddExact(
     /* Restrict the range to be reordered by excluding unused variables
     ** at the two ends. */
     while (table->subtables[lower].keys == 1 &&
-           table->vars[table->invperm[lower]]->ref == 1 &&
-           lower < upper)
-        lower++;
+	   table->vars[table->invperm[lower]]->ref == 1 &&
+	   lower < upper)
+	lower++;
     while (table->subtables[upper].keys == 1 &&
-           table->vars[table->invperm[upper]]->ref == 1 &&
-           lower < upper)
-        upper--;
+	   table->vars[table->invperm[upper]]->ref == 1 &&
+	   lower < upper)
+	upper--;
     if (lower == upper) return(1); /* trivial problem */
 
     /* Apply symmetric sifting to get a good upper bound and to extract
@@ -195,7 +157,7 @@ cuddExact(
 
 #ifdef DD_STATS
     (void) fprintf(table->out,"\n");
-    ddTotalShuffles = 0;
+    table->totalShuffles = 0;
     ddTotalSubsets = 0;
 #endif
 
@@ -206,9 +168,9 @@ cuddExact(
     ** used to compute maxBinomial. */
     unused = 0;
     for (i = lower + 1; i < upper; i++) {
-        if (table->subtables[i].keys == 1 &&
-            table->vars[table->invperm[i]]->ref == 1)
-            unused++;
+	if (table->subtables[i].keys == 1 &&
+	    table->vars[table->invperm[i]]->ref == 1)
+	    unused++;
     }
 
     /* Find the maximum number of subsets we may have to store. */
@@ -218,19 +180,19 @@ cuddExact(
     newOrder = getMatrix(maxBinomial, size);
     if (newOrder == NULL) goto cuddExactOutOfMem;
 
-    newCost = ABC_ALLOC(int, maxBinomial);
+    newCost = ALLOC(int, maxBinomial);
     if (newCost == NULL) goto cuddExactOutOfMem;
 
     oldOrder = getMatrix(maxBinomial, size);
     if (oldOrder == NULL) goto cuddExactOutOfMem;
 
-    oldCost = ABC_ALLOC(int, maxBinomial);
+    oldCost = ALLOC(int, maxBinomial);
     if (oldCost == NULL) goto cuddExactOutOfMem;
 
-    bestOrder = ABC_ALLOC(DdHalfWord, size);
+    bestOrder = ALLOC(DdHalfWord, size);
     if (bestOrder == NULL) goto cuddExactOutOfMem;
 
-    mask = ABC_ALLOC(char, nvars);
+    mask = ALLOC(char, nvars);
     if (mask == NULL) goto cuddExactOutOfMem;
 
     symmInfo = initSymmInfo(table, lower, upper);
@@ -245,65 +207,65 @@ cuddExact(
     */
     oldSubsets = 1;
     for (i = 0; i < size; i++) {
-        oldOrder[0][i] = bestOrder[i] = (DdHalfWord) table->invperm[i+lower];
+	oldOrder[0][i] = bestOrder[i] = (DdHalfWord) table->invperm[i+lower];
     }
-    subsetCost = table->constants.keys;
+    subsetCost = (int) table->constants.keys;
     for (i = upper + 1; i < nvars; i++)
-        subsetCost += getLevelKeys(table,i);
+	subsetCost += getLevelKeys(table,i);
     oldCost[0] = subsetCost;
     /* The upper bound is initialized to the current size of the BDDs. */
-    upperBound = table->keys - table->isolated;
+    upperBound = (int) (table->keys - table->isolated);
 
     /* Now consider subsets of increasing size. */
     for (k = 1; k <= size; k++) {
 #ifdef DD_STATS
-        (void) fprintf(table->out,"Processing subsets of size %d\n", k);
-        fflush(table->out);
+	(void) fprintf(table->out,"Processing subsets of size %d\n", k);
+	fflush(table->out);
 #endif
-        newSubsets = 0;
-        level = size - k;               /* offset of first bottom variable */
+	newSubsets = 0;
+	level = size - k;		/* offset of first bottom variable */
 
-        for (i = 0; i < oldSubsets; i++) { /* for each subset of size k-1 */
-            order = oldOrder[i];
-            cost = oldCost[i];
-            lowerBound = computeLB(table, order, roots, cost, lower, upper,
-                                   level);
-            if (lowerBound >= upperBound)
-                continue;
-            /* Impose new order. */
-            result = ddShuffle(table, order, lower, upper);
-            if (result == 0) goto cuddExactOutOfMem;
-            upperBound = updateUB(table,upperBound,bestOrder,lower,upper);
-            /* For each top bottom variable. */
-            for (j = level; j >= 0; j--) {
-                /* Skip unused variables. */
-                if (table->subtables[j+lower-1].keys == 1 &&
-                    table->vars[table->invperm[j+lower-1]]->ref == 1) continue;
-                /* Find cost under this order. */
-                subsetCost = cost + getLevelKeys(table, lower + level);
-                newSubsets = updateEntry(table, order, level, subsetCost,
-                                         newOrder, newCost, newSubsets, mask,
-                                         lower, upper);
-                if (j == 0)
-                    break;
-                if (checkSymmInfo(table, symmInfo, order[j-1], level) == 0)
-                    continue;
-                pushDown(order,j-1,level);
-                /* Impose new order. */
-                result = ddShuffle(table, order, lower, upper);
-                if (result == 0) goto cuddExactOutOfMem;
-                upperBound = updateUB(table,upperBound,bestOrder,lower,upper);
-            } /* for each bottom variable */
-        } /* for each subset of size k */
+	for (i = 0; i < oldSubsets; i++) { /* for each subset of size k-1 */
+	    order = oldOrder[i];
+	    cost = oldCost[i];
+	    lowerBound = computeLB(table, order, roots, cost, lower, upper,
+				   level);
+	    if (lowerBound >= upperBound)
+		continue;
+	    /* Impose new order. */
+	    result = ddShuffle(table, order, lower, upper);
+	    if (result == 0) goto cuddExactOutOfMem;
+	    upperBound = updateUB(table,upperBound,bestOrder,lower,upper);
+	    /* For each top bottom variable. */
+	    for (j = level; j >= 0; j--) {
+		/* Skip unused variables. */
+		if (table->subtables[j+lower-1].keys == 1 &&
+		    table->vars[table->invperm[j+lower-1]]->ref == 1) continue;
+		/* Find cost under this order. */
+		subsetCost = cost + getLevelKeys(table, lower + level);
+		newSubsets = updateEntry(table, order, level, subsetCost,
+					 newOrder, newCost, newSubsets, mask,
+					 lower, upper);
+		if (j == 0)
+		    break;
+		if (checkSymmInfo(table, symmInfo, (int) order[j-1], level) == 0)
+		    continue;
+		pushDown(order,j-1,level);
+		/* Impose new order. */
+		result = ddShuffle(table, order, lower, upper);
+		if (result == 0) goto cuddExactOutOfMem;
+		upperBound = updateUB(table,upperBound,bestOrder,lower,upper);
+	    } /* for each bottom variable */
+	} /* for each subset of size k */
 
-        /* New orders become old orders in preparation for next iteration. */
-        tmpOrder = oldOrder; tmpCost = oldCost;
-        oldOrder = newOrder; oldCost = newCost;
-        newOrder = tmpOrder; newCost = tmpCost;
+	/* New orders become old orders in preparation for next iteration. */
+	tmpOrder = oldOrder; tmpCost = oldCost;
+	oldOrder = newOrder; oldCost = newCost;
+	newOrder = tmpOrder; newCost = tmpCost;
 #ifdef DD_STATS
-        ddTotalSubsets += newSubsets;
+	ddTotalSubsets += newSubsets;
 #endif
-        oldSubsets = newSubsets;
+	oldSubsets = newSubsets;
     }
     result = ddShuffle(table, bestOrder, lower, upper);
     if (result == 0) goto cuddExactOutOfMem;
@@ -312,53 +274,50 @@ cuddExact(
     (void) fprintf(table->out,"\n");
 #endif
     (void) fprintf(table->out,"#:S_EXACT   %8d: total subsets\n",
-                   ddTotalSubsets);
+		   ddTotalSubsets);
     (void) fprintf(table->out,"#:H_EXACT   %8d: total shuffles",
-                   ddTotalShuffles);
+		   table->totalShuffles);
 #endif
 
     freeMatrix(newOrder);
     freeMatrix(oldOrder);
-    ABC_FREE(bestOrder);
-    ABC_FREE(oldCost);
-    ABC_FREE(newCost);
-    ABC_FREE(symmInfo);
-    ABC_FREE(mask);
+    FREE(bestOrder);
+    FREE(oldCost);
+    FREE(newCost);
+    FREE(symmInfo);
+    FREE(mask);
     return(1);
 
 cuddExactOutOfMem:
 
     if (newOrder != NULL) freeMatrix(newOrder);
     if (oldOrder != NULL) freeMatrix(oldOrder);
-    if (bestOrder != NULL) ABC_FREE(bestOrder);
-    if (oldCost != NULL) ABC_FREE(oldCost);
-    if (newCost != NULL) ABC_FREE(newCost);
-    if (symmInfo != NULL) ABC_FREE(symmInfo);
-    if (mask != NULL) ABC_FREE(mask);
+    if (bestOrder != NULL) FREE(bestOrder);
+    if (oldCost != NULL) FREE(oldCost);
+    if (newCost != NULL) FREE(newCost);
+    if (symmInfo != NULL) FREE(symmInfo);
+    if (mask != NULL) FREE(mask);
     table->errorCode = CUDD_MEMORY_OUT;
     return(0);
 
 } /* end of cuddExact */
 
 
-/**Function********************************************************************
+/**
+  @brief Returns the maximum value of `(n choose k)` for a given `n`.
 
-  Synopsis    [Returns the maximum value of (n choose k) for a given n.]
-
-  Description [Computes the maximum value of (n choose k) for a given
-  n.  The maximum value occurs for k = n/2 when n is even, or k =
-  (n-1)/2 when n is odd.  The algorithm used in this procedure avoids
+  @details Computes the maximum value of `(n choose k)` for a given
+  `n`.  The maximum value occurs for `k = n/2` when `n` is even, or `k =
+  (n-1)/2` when `n` is odd.  The algorithm used in this procedure avoids
   intermediate overflow problems.  It is based on the identity
-  <pre>
-    binomial(n,k) = n/k * binomial(n-1,k-1).
-  </pre>
-  Returns the computed value if successful; -1 if out of range.]
 
-  SideEffects [None]
+      binomial(n,k) = n/k * binomial(n-1,k-1).
 
-  SeeAlso     []
+  @return the computed value if successful; -1 if out of range.
 
-******************************************************************************/
+  @sideeffect None
+
+*/
 static int
 getMaxBinomial(
   int n)
@@ -369,8 +328,8 @@ getMaxBinomial(
     if (n < 2) return(1);
 
     for (result = (double)((n+3)/2), i = result+1, j=2; i <= n; i++, j++) {
-        result *= i;
-        result /= j;
+	result *= i;
+	result /= j;
     }
 
     return((int)result);
@@ -379,18 +338,15 @@ getMaxBinomial(
 
 
 #if 0
-/**Function********************************************************************
+/**
+  @brief Returns the gcd of two integers.
 
-  Synopsis    [Returns the gcd of two integers.]
+  @details Uses the binary GCD algorithm described in Cormen,
+  Leiserson, and Rivest.
 
-  Description [Returns the gcd of two integers. Uses the binary GCD
-  algorithm described in Cormen, Leiserson, and Rivest.]
+  @sideeffect None
 
-  SideEffects [None]
-
-  SeeAlso     []
-
-******************************************************************************/
+*/
 static int
 gcd(
   int  x,
@@ -410,23 +366,23 @@ gcd(
     ** Hence, we only need to check for when they become equal.
     */
     while (a != b) {
-        if (a & lsbMask) {
-            if (b & lsbMask) {  /* both odd */
-                if (a < b) {
-                    b = (b - a) >> 1;
-                } else {
-                    a = (a - b) >> 1;
-                }
-            } else {            /* a odd, b even */
-                b >>= 1;
-            }
-        } else {
-            if (b & lsbMask) {  /* a even, b odd */
-                a >>= 1;
-            } else {            /* both even */
-                lsbMask <<= 1;
-            }
-        }
+	if (a & lsbMask) {
+	    if (b & lsbMask) {	/* both odd */
+		if (a < b) {
+		    b = (b - a) >> 1;
+		} else {
+		    a = (a - b) >> 1;
+		}
+	    } else {		/* a odd, b even */
+		b >>= 1;
+	    }
+	} else {
+	    if (b & lsbMask) {	/* a even, b odd */
+		a >>= 1;
+	    } else {		/* both even */
+		lsbMask <<= 1;
+	    }
+	}
     }
 
     return(a);
@@ -435,18 +391,16 @@ gcd(
 #endif
 
 
-/**Function********************************************************************
+/**
+  @brief Allocates a two-dimensional matrix of ints.
 
-  Synopsis    [Allocates a two-dimensional matrix of ints.]
+  @return the pointer to the matrix if successful; NULL otherwise.
 
-  Description [Allocates a two-dimensional matrix of ints.
-  Returns the pointer to the matrix if successful; NULL otherwise.]
+  @sideeffect None
 
-  SideEffects [None]
+  @see freeMatrix
 
-  SeeAlso     [freeMatrix]
-
-******************************************************************************/
+*/
 static DdHalfWord **
 getMatrix(
   int  rows /* number of rows */,
@@ -456,55 +410,48 @@ getMatrix(
     int i;
 
     if (cols*rows == 0) return(NULL);
-    matrix = ABC_ALLOC(DdHalfWord *, rows);
+    matrix = ALLOC(DdHalfWord *, rows);
     if (matrix == NULL) return(NULL);
-    matrix[0] = ABC_ALLOC(DdHalfWord, cols*rows);
+    matrix[0] = ALLOC(DdHalfWord, cols*rows);
     if (matrix[0] == NULL) {
-        ABC_FREE(matrix);
-        return(NULL);
+	FREE(matrix);
+	return(NULL);
     }
     for (i = 1; i < rows; i++) {
-        matrix[i] = matrix[i-1] + cols;
+	matrix[i] = matrix[i-1] + cols;
     }
     return(matrix);
 
 } /* end of getMatrix */
 
 
-/**Function********************************************************************
+/**
+  @brief Frees a two-dimensional matrix allocated by getMatrix.
 
-  Synopsis    [Frees a two-dimensional matrix allocated by getMatrix.]
+  @sideeffect None
 
-  Description []
+  @see getMatrix
 
-  SideEffects [None]
-
-  SeeAlso     [getMatrix]
-
-******************************************************************************/
+*/
 static void
 freeMatrix(
   DdHalfWord ** matrix)
 {
-    ABC_FREE(matrix[0]);
-    ABC_FREE(matrix);
+    FREE(matrix[0]);
+    FREE(matrix);
     return;
 
 } /* end of freeMatrix */
 
 
-/**Function********************************************************************
+/**
+  @brief Returns the number of nodes at one level of a unique table.
 
-  Synopsis    [Returns the number of nodes at one level of a unique table.]
+  @details The projection function, if isolated, is not counted.
 
-  Description [Returns the number of nodes at one level of a unique table.
-  The projection function, if isolated, is not counted.]
+  @sideeffect None
 
-  SideEffects [None]
-
-  SeeAlso []
-
-******************************************************************************/
+*/
 static int
 getLevelKeys(
   DdManager * table,
@@ -516,27 +463,25 @@ getLevelKeys(
     x = table->invperm[l];
     isolated = table->vars[x]->ref == 1;
 
-    return(table->subtables[l].keys - isolated);
+    return((int) table->subtables[l].keys - isolated);
 
 } /* end of getLevelKeys */
 
 
-/**Function********************************************************************
+/**
+  @brief Reorders variables according to a given permutation.
 
-  Synopsis    [Reorders variables according to a given permutation.]
+  @details The i-th permutation array contains the index of the
+  variable that should be brought to the i-th level. ddShuffle assumes
+  that no dead nodes are present and that the interaction matrix is
+  properly initialized.  The reordering is achieved by a series of
+  upward sifts.
 
-  Description [Reorders variables according to a given permutation.
-  The i-th permutation array contains the index of the variable that
-  should be brought to the i-th level. ddShuffle assumes that no
-  dead nodes are present and that the interaction matrix is properly
-  initialized.  The reordering is achieved by a series of upward sifts.
-  Returns 1 if successful; 0 otherwise.]
+  @return 1 if successful; 0 otherwise.
 
-  SideEffects [None]
+  @sideeffect None
 
-  SeeAlso []
-
-******************************************************************************/
+*/
 static int
 ddShuffle(
   DdManager * table,
@@ -544,59 +489,51 @@ ddShuffle(
   int  lower,
   int  upper)
 {
-    DdHalfWord  index;
-    int         level;
-    int         position;
+    DdHalfWord	index;
+    int		level;
+    int		position;
 #if 0
-    int         numvars;
+    int		numvars;
 #endif
-    int         result;
-#ifdef DD_STATS
-    long        localTime;
-    int         initialSize;
-#ifdef DD_VERBOSE
-    int         finalSize;
-#endif
-    int         previousSize;
+    int		result;
+#if defined(DD_STATS) && defined(DD_VERBOSE)
+    int		initialSize;
+    int		finalSize;
 #endif
 
-#ifdef DD_STATS
-    localTime = util_cpu_time();
-    initialSize = table->keys - table->isolated;
+#if defined(DD_STATS) && defined(DD_VERBOSE)
+    initialSize = (int) (table->keys - table->isolated);
 #endif
 
 #if 0
     numvars = table->size;
 
-    (void) fprintf(table->out,"%d:", ddTotalShuffles);
+    (void) fprintf(table->out,"%d:", table->totalShuffles);
     for (level = 0; level < numvars; level++) {
-        (void) fprintf(table->out," %d", table->invperm[level]);
+	(void) fprintf(table->out," %d", table->invperm[level]);
     }
     (void) fprintf(table->out,"\n");
 #endif
 
     for (level = 0; level <= upper - lower; level++) {
-        index = permutation[level];
-        position = table->perm[index];
-#ifdef DD_STATS
-        previousSize = table->keys - table->isolated;
-#endif
-        result = ddSiftUp(table,position,level+lower);
-        if (!result) return(0);
+	index = permutation[level];
+	position = table->perm[index];
+	result = ddSiftUp(table,position,level+lower);
+	if (!result) return(0);
     }
 
 #ifdef DD_STATS
-    ddTotalShuffles++;
+    table->totalShuffles++;
 #ifdef DD_VERBOSE
-    finalSize = table->keys - table->isolated;
+    finalSize = (int) (table->keys - table->isolated);
     if (finalSize < initialSize) {
-        (void) fprintf(table->out,"-");
+	(void) fprintf(table->out,"-");
     } else if (finalSize > initialSize) {
-        (void) fprintf(table->out,"+");
+	(void) fprintf(table->out,"+");
     } else {
-        (void) fprintf(table->out,"=");
+	(void) fprintf(table->out,"=");
     }
-    if ((ddTotalShuffles & 63) == 0) (void) fprintf(table->out,"\n");
+    if ((table->totalShuffles & 63) == 0) (void) fprintf(table->out,"\n");
     fflush(table->out);
 #endif
 #endif
@@ -606,19 +543,17 @@ ddShuffle(
 } /* end of ddShuffle */
 
 
-/**Function********************************************************************
+/**
+  @brief Moves one variable up.
 
-  Synopsis    [Moves one variable up.]
-
-  Description [Takes a variable from position x and sifts it up to
+  @details Takes a variable from position x and sifts it up to
   position xLow;  xLow should be less than or equal to x.
-  Returns 1 if successful; 0 otherwise]
 
-  SideEffects [None]
+  @return 1 if successful; 0 otherwise
 
-  SeeAlso     []
+  @sideeffect None
 
-******************************************************************************/
+*/
 static int
 ddSiftUp(
   DdManager * table,
@@ -630,30 +565,26 @@ ddSiftUp(
 
     y = cuddNextLow(table,x);
     while (y >= xLow) {
-        size = cuddSwapInPlace(table,y,x);
-        if (size == 0) {
-            return(0);
-        }
-        x = y;
-        y = cuddNextLow(table,x);
+	size = cuddSwapInPlace(table,y,x);
+	if (size == 0) {
+	    return(0);
+	}
+	x = y;
+	y = cuddNextLow(table,x);
     }
     return(1);
 
 } /* end of ddSiftUp */
 
 
-/**Function********************************************************************
+/**
+  @brief Updates the upper bound and saves the best order seen so far.
 
-  Synopsis    [Updates the upper bound and saves the best order seen so far.]
+  @return the current value of the upper bound.
 
-  Description [Updates the upper bound and saves the best order seen so far.
-  Returns the current value of the upper bound.]
+  @sideeffect None
 
-  SideEffects [None]
-
-  SeeAlso     []
-
-******************************************************************************/
+*/
 static int
 updateUB(
   DdManager * table,
@@ -663,39 +594,40 @@ updateUB(
   int  upper)
 {
     int i;
-    int newBound = table->keys - table->isolated;
+    int newBound = (int) (table->keys - table->isolated);
 
     if (newBound < oldBound) {
 #ifdef DD_STATS
-        (void) fprintf(table->out,"New upper bound = %d\n", newBound);
-        fflush(table->out);
+	(void) fprintf(table->out,"New upper bound = %d\n", newBound);
+	fflush(table->out);
 #endif
-        for (i = lower; i <= upper; i++)
-            bestOrder[i-lower] = (DdHalfWord) table->invperm[i];
-        return(newBound);
+	for (i = lower; i <= upper; i++)
+	    bestOrder[i-lower] = (DdHalfWord) table->invperm[i];
+	return(newBound);
     } else {
-        return(oldBound);
+	return(oldBound);
     }
 
 } /* end of updateUB */
 
 
-/**Function********************************************************************
+/**
+  @brief Counts the number of roots.
 
-  Synopsis    [Counts the number of roots.]
+  @details Counts the number of roots at the levels between lower and
+  upper.  The computation is based on breadth-first search.  A node is
+  a root if it is not reachable from any previously visited node.
+  (All the nodes at level lower are therefore considered roots.)  The
+  roots that are constant nodes are always ignored.  The visited flag
+  uses the LSB of the next pointer.
 
-  Description [Counts the number of roots at the levels between lower and
-  upper.  The computation is based on breadth-first search.
-  A node is a root if it is not reachable from any previously visited node.
-  (All the nodes at level lower are therefore considered roots.)
-  The visited flag uses the LSB of the next pointer.  Returns the root
-  count. The roots that are constant nodes are always ignored.]
+  @return the root count.
 
-  SideEffects [None]
+  @sideeffect None
 
-  SeeAlso     [ddClearGlobal]
+  @see ddClearGlobal
 
-******************************************************************************/
+*/
 static int
 ddCountRoots(
   DdManager * table,
@@ -711,36 +643,36 @@ ddCountRoots(
     int maxlevel = lower;
 
     for (i = lower; i <= upper; i++) {
-        nodelist = table->subtables[i].nodelist;
-        slots = table->subtables[i].slots;
-        for (j = 0; j < slots; j++) {
-            f = nodelist[j];
-            while (f != sentinel) {
-                /* A node is a root of the DAG if it cannot be
-                ** reached by nodes above it. If a node was never
-                ** reached during the previous depth-first searches,
-                ** then it is a root, and we start a new depth-first
-                ** search from it.
-                */
-                if (!Cudd_IsComplement(f->next)) {
-                    if (f != table->vars[f->index]) {
-                        roots++;
-                    }
-                }
-                if (!Cudd_IsConstant(cuddT(f))) {
-                    cuddT(f)->next = Cudd_Complement(cuddT(f)->next);
-                    if (table->perm[cuddT(f)->index] > maxlevel)
-                        maxlevel = table->perm[cuddT(f)->index];
-                }
-                if (!Cudd_IsConstant(cuddE(f))) {
-                    Cudd_Regular(cuddE(f))->next =
-                        Cudd_Complement(Cudd_Regular(cuddE(f))->next);
-                    if (table->perm[Cudd_Regular(cuddE(f))->index] > maxlevel)
-                        maxlevel = table->perm[Cudd_Regular(cuddE(f))->index];
-                }
-                f = Cudd_Regular(f->next);
-            }
-        }
+	nodelist = table->subtables[i].nodelist;
+	slots = (int) table->subtables[i].slots;
+	for (j = 0; j < slots; j++) {
+	    f = nodelist[j];
+	    while (f != sentinel) {
+		/* A node is a root of the DAG if it cannot be
+		** reached by nodes above it. If a node was never
+		** reached during the previous depth-first searches,
+		** then it is a root, and we start a new depth-first
+		** search from it.
+		*/
+		if (!Cudd_IsComplement(f->next)) {
+		    if (f != table->vars[f->index]) {
+			roots++;
+		    }
+		}
+		if (!cuddIsConstant(cuddT(f))) {
+		    cuddT(f)->next = Cudd_Complement(cuddT(f)->next);
+		    if (table->perm[cuddT(f)->index] > maxlevel)
+			maxlevel = table->perm[cuddT(f)->index];
+		}
+		if (!Cudd_IsConstantInt(cuddE(f))) {
+		    Cudd_Regular(cuddE(f))->next =
+			Cudd_Complement(Cudd_Regular(cuddE(f))->next);
+		    if (table->perm[Cudd_Regular(cuddE(f))->index] > maxlevel)
+			maxlevel = table->perm[Cudd_Regular(cuddE(f))->index];
+		}
+		f = Cudd_Regular(f->next);
+	    }
+	}
     }
     ddClearGlobal(table, lower, maxlevel);
 
@@ -749,20 +681,18 @@ ddCountRoots(
 } /* end of ddCountRoots */
 
 
-/**Function********************************************************************
+/**
+  @brief Scans the %DD and clears the LSB of the next pointers.
 
-  Synopsis    [Scans the DD and clears the LSB of the next pointers.]
+  @details The LSB of the next pointers are used as markers to tell
+  whether a node was reached. Once the roots are counted, these flags
+  are reset.
 
-  Description [Scans the DD and clears the LSB of the next pointers.
-  The LSB of the next pointers are used as markers to tell whether a
-  node was reached. Once the roots are counted, these flags are
-  reset.]
+  @sideeffect None
 
-  SideEffects [None]
+  @see ddCountRoots
 
-  SeeAlso     [ddCountRoots]
-
-******************************************************************************/
+*/
 static void
 ddClearGlobal(
   DdManager * table,
@@ -776,48 +706,44 @@ ddClearGlobal(
     int slots;
 
     for (i = lower; i <= maxlevel; i++) {
-        nodelist = table->subtables[i].nodelist;
-        slots = table->subtables[i].slots;
-        for (j = 0; j < slots; j++) {
-            f = nodelist[j];
-            while (f != sentinel) {
-                f->next = Cudd_Regular(f->next);
-                f = f->next;
-            }
-        }
+	nodelist = table->subtables[i].nodelist;
+	slots = (int) table->subtables[i].slots;
+	for (j = 0; j < slots; j++) {
+	    f = nodelist[j];
+	    while (f != sentinel) {
+		f->next = Cudd_Regular(f->next);
+		f = f->next;
+	    }
+	}
     }
 
 } /* end of ddClearGlobal */
 
 
-/**Function********************************************************************
+/**
+  @brief Computes a lower bound on the size of a %BDD.
 
-  Synopsis    [Computes a lower bound on the size of a BDD.]
-
-  Description [Computes a lower bound on the size of a BDD from the
-  following factors:
+  @details The lower bound depends on the following factors:
   <ul>
   <li> size of the lower part of it;
   <li> size of the part of the upper part not subjected to reordering;
-  <li> number of roots in the part of the BDD subjected to reordering;
+  <li> number of roots in the part of the %BDD subjected to reordering;
   <li> variable in the support of the roots in the upper part of the
-       BDD subjected to reordering.
-  <ul/>]
+       %BDD subjected to reordering.
+  </ul>
 
-  SideEffects [None]
+  @sideeffect None
 
-  SeeAlso     []
-
-******************************************************************************/
+*/
 static int
 computeLB(
-  DdManager * table             /* manager */,
-  DdHalfWord * order            /* optimal order for the subset */,
-  int  roots                    /* roots between lower and upper */,
-  int  cost                     /* minimum cost for the subset */,
-  int  lower                    /* lower level to be reordered */,
-  int  upper                    /* upper level to be reordered */,
-  int  level                    /* offset for the current top bottom var */
+  DdManager * table		/**< manager */,
+  DdHalfWord * order		/**< optimal order for the subset */,
+  int  roots			/**< roots between lower and upper */,
+  int  cost			/**< minimum cost for the subset */,
+  int  lower			/**< lower level to be reordered */,
+  int  upper			/**< upper level to be reordered */,
+  int  level			/**< offset for the current top bottom var */
   )
 {
     int i;
@@ -831,28 +757,28 @@ computeLB(
     ** Add their sizes to the lower bound.
     */
     for (i = 0; i < lower; i++) {
-        lb += getLevelKeys(table,i);
+	lb += getLevelKeys(table,i);
     }
     /* If a variable is in the support, then there is going
     ** to be at least one node labeled by that variable.
     */
     for (i = lower; i <= lower+level; i++) {
-        support = table->subtables[i].keys > 1 ||
-            table->vars[order[i-lower]]->ref > 1;
-        lb1 += support;
+	support = table->subtables[i].keys > 1 ||
+	    table->vars[order[i-lower]]->ref > 1;
+	lb1 += support;
     }
 
     /* Estimate the number of nodes required to connect the roots to
     ** the nodes in the bottom part. */
     if (lower+level+1 < table->size) {
-        if (lower+level < upper)
-            ref = table->vars[order[level+1]]->ref;
-        else
-            ref = table->vars[table->invperm[upper+1]]->ref;
-        lb2 = table->subtables[lower+level+1].keys -
+	if (lower+level < upper)
+	    ref = table->vars[order[level+1]]->ref;
+	else
+	    ref = table->vars[table->invperm[upper+1]]->ref;
+	lb2 = (int) table->subtables[lower+level+1].keys -
             (ref > (DdHalfWord) 1) - roots;
     } else {
-        lb2 = 0;
+	lb2 = 0;
     }
 
     lb += lb1 > lb2 ? lb1 : lb2;
@@ -862,20 +788,18 @@ computeLB(
 } /* end of computeLB */
 
 
-/**Function********************************************************************
+/**
+  @brief Updates entry for a subset.
 
-  Synopsis    [Updates entry for a subset.]
+  @details Finds the subset, if it exists.  If the new order for the
+  subset has lower cost, or if the subset did not exist, it stores the
+  new order and cost.
 
-  Description [Updates entry for a subset. Finds the subset, if it exists.
-  If the new order for the subset has lower cost, or if the subset did not
-  exist, it stores the new order and cost. Returns the number of subsets
-  currently in the table.]
+  @return the number of subsets currently in the table.
 
-  SideEffects [None]
+  @sideeffect None
 
-  SeeAlso     []
-
-******************************************************************************/
+*/
 static int
 updateEntry(
   DdManager * table,
@@ -894,42 +818,37 @@ updateEntry(
 
     /* Build a mask that says what variables are in this subset. */
     for (i = lower; i <= upper; i++)
-        mask[table->invperm[i]] = 0;
+	mask[table->invperm[i]] = 0;
     for (i = level; i < size; i++)
-        mask[order[i]] = 1;
+	mask[order[i]] = 1;
 
     /* Check each subset until a match is found or all subsets are examined. */
     for (i = 0; i < subsets; i++) {
-        DdHalfWord *subset = orders[i];
-        for (j = level; j < size; j++) {
-            if (mask[subset[j]] == 0)
-                break;
-        }
-        if (j == size)          /* no mismatches: success */
-            break;
+	DdHalfWord *subset = orders[i];
+	for (j = level; j < size; j++) {
+	    if (mask[subset[j]] == 0)
+		break;
+	}
+	if (j == size)		/* no mismatches: success */
+	    break;
     }
-    if (i == subsets || cost < costs[i]) {              /* add or replace */
-        for (j = 0; j < size; j++)
-            orders[i][j] = order[j];
-        costs[i] = cost;
-        subsets += (i == subsets);
+    if (i == subsets || cost < costs[i]) {		/* add or replace */
+	for (j = 0; j < size; j++)
+	    orders[i][j] = order[j];
+	costs[i] = cost;
+	subsets += (i == subsets);
     }
     return(subsets);
 
 } /* end of updateEntry */
 
 
-/**Function********************************************************************
+/**
+  @brief Pushes a variable in the order down to position "level."
 
-  Synopsis    [Pushes a variable in the order down to position "level."]
+  @sideeffect None
 
-  Description []
-
-  SideEffects [None]
-
-  SeeAlso     []
-
-******************************************************************************/
+*/
 static void
 pushDown(
   DdHalfWord * order,
@@ -941,7 +860,7 @@ pushDown(
 
     tmp = order[j];
     for (i = j; i < level; i++) {
-        order[i] = order[i+1];
+	order[i] = order[i+1];
     }
     order[level] = tmp;
     return;
@@ -949,11 +868,10 @@ pushDown(
 } /* end of pushDown */
 
 
-/**Function********************************************************************
+/**
+  @brief Gathers symmetry information.
 
-  Synopsis    [Gathers symmetry information.]
-
-  Description [Translates the symmetry information stored in the next
+  @details Translates the symmetry information stored in the next
   field of each subtable from level to indices. This procedure is called
   immediately after symmetric sifting, so that the next fields are correct.
   By translating this informaton in terms of indices, we make it independent
@@ -961,13 +879,13 @@ pushDown(
   a circular list where each variable points to the next variable in the
   same symmetry group. Only the entries between lower and upper are
   considered.  The procedure returns a pointer to an array
-  holding the symmetry information if successful; NULL otherwise.]
+  holding the symmetry information if successful; NULL otherwise.
 
-  SideEffects [None]
+  @sideeffect None
 
-  SeeAlso     [checkSymmInfo]
+  @see checkSymmInfo
 
-******************************************************************************/
+*/
 static DdHalfWord *
 initSymmInfo(
   DdManager * table,
@@ -977,33 +895,32 @@ initSymmInfo(
     int level, index, next, nextindex;
     DdHalfWord *symmInfo;
 
-    symmInfo =  ABC_ALLOC(DdHalfWord, table->size);
+    symmInfo =  ALLOC(DdHalfWord, table->size);
     if (symmInfo == NULL) return(NULL);
 
     for (level = lower; level <= upper; level++) {
-        index = table->invperm[level];
-        next =  table->subtables[level].next;
-        nextindex = table->invperm[next];
-        symmInfo[index] = nextindex;
+	index = table->invperm[level];
+	next =  (int) table->subtables[level].next;
+	nextindex = table->invperm[next];
+	symmInfo[index] = (DdHalfWord) nextindex;
     }
     return(symmInfo);
 
 } /* end of initSymmInfo */
 
 
-/**Function********************************************************************
+/**
+  @brief Check symmetry condition.
 
-  Synopsis    [Check symmetry condition.]
-
-  Description [Returns 1 if a variable is the one with the highest index
+  @details Returns 1 if a variable is the one with the highest index
   among those belonging to a symmetry group that are in the top part of
-  the BDD.  The top part is given by level.]
+  the %BDD.  The top part is given by level.
 
-  SideEffects [None]
+  @sideeffect None
 
-  SeeAlso     [initSymmInfo]
+  @see initSymmInfo
 
-******************************************************************************/
+*/
 static int
 checkSymmInfo(
   DdManager * table,
@@ -1013,16 +930,14 @@ checkSymmInfo(
 {
     int i;
 
-    i = symmInfo[index];
+    i = (int) symmInfo[index];
     while (i != index) {
-        if (index < i && table->perm[i] <= level)
-            return(0);
-        i = symmInfo[i];
+	if (index < i && table->perm[i] <= level)
+	    return(0);
+	i = (int) symmInfo[i];
     }
     return(1);
 
 } /* end of checkSymmInfo */
 
-
 ABC_NAMESPACE_IMPL_END
-

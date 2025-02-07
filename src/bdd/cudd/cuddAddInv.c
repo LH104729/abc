@@ -1,23 +1,14 @@
-/**CFile***********************************************************************
+/**
+  @file
 
-  FileName    [cuddAddInv.c]
+  @ingroup cudd
 
-  PackageName [cudd]
+  @brief Function to compute the scalar inverse of an %ADD.
 
-  Synopsis    [Function to compute the scalar inverse of an ADD.]
+  @author Fabio Somenzi
 
-  Description [External procedures included in this module:
-                <ul>
-                <li> Cudd_addScalarInverse()
-                </ul>
-            Internal procedures included in this module:
-                <ul>
-                <li> cuddAddScalarInverseRecur()
-                </ul>]
-
-  Author      [Fabio Somenzi]
-
-  Copyright   [Copyright (c) 1995-2004, Regents of the University of Colorado
+  @copyright@parblock
+  Copyright (c) 1995-2015, Regents of the University of Colorado
 
   All rights reserved.
 
@@ -47,18 +38,15 @@
   CAUSED AND ON ANY THEORY OF LIABILITY, WHETHER IN CONTRACT, STRICT
   LIABILITY, OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN
   ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE
-  POSSIBILITY OF SUCH DAMAGE.]
+  POSSIBILITY OF SUCH DAMAGE.
+  @endparblock
 
-******************************************************************************/
+*/
 
 #include "misc/util/util_hack.h"
 #include "cuddInt.h"
 
 ABC_NAMESPACE_IMPL_START
-
-
-
-
 /*---------------------------------------------------------------------------*/
 /* Constant declarations                                                     */
 /*---------------------------------------------------------------------------*/
@@ -78,24 +66,18 @@ ABC_NAMESPACE_IMPL_START
 /* Variable declarations                                                     */
 /*---------------------------------------------------------------------------*/
 
-#ifndef lint
-static char rcsid[] DD_UNUSED = "$Id: cuddAddInv.c,v 1.9 2004/08/13 18:04:45 fabio Exp $";
-#endif
-
 
 /*---------------------------------------------------------------------------*/
 /* Macro declarations                                                        */
 /*---------------------------------------------------------------------------*/
 
-
-/**AutomaticStart*************************************************************/
+/** \cond */
 
 /*---------------------------------------------------------------------------*/
 /* Static function prototypes                                                */
 /*---------------------------------------------------------------------------*/
 
-
-/**AutomaticEnd***************************************************************/
+/** \endcond */
 
 
 /*---------------------------------------------------------------------------*/
@@ -103,19 +85,19 @@ static char rcsid[] DD_UNUSED = "$Id: cuddAddInv.c,v 1.9 2004/08/13 18:04:45 fab
 /*---------------------------------------------------------------------------*/
 
 
-/**Function********************************************************************
-
-  Synopsis    [Computes the scalar inverse of an ADD.]
+/**
+  @brief Computes the scalar inverse of an %ADD.
   
-  Description [Computes an n ADD where the discriminants are the
+  @details Computes an n %ADD where the discriminants are the
   multiplicative inverses of the corresponding discriminants of the
-  argument ADD.  Returns a pointer to the resulting ADD in case of
-  success. Returns NULL if any discriminants smaller than epsilon is
-  encountered.]
+  argument %ADD.
 
-  SideEffects [None]
+  @return a pointer to the resulting %ADD in case of success. Returns
+  NULL if any discriminants smaller than epsilon is encountered.
 
-******************************************************************************/
+  @sideeffect None
+
+*/
 DdNode *
 Cudd_addScalarInverse(
   DdManager * dd,
@@ -125,13 +107,16 @@ Cudd_addScalarInverse(
     DdNode *res;
 
     if (!cuddIsConstant(epsilon)) {
-        (void) fprintf(dd->err,"Invalid epsilon\n");
-        return(NULL);
+	(void) fprintf(dd->err,"Invalid epsilon\n");
+	return(NULL);
     }
     do {
-        dd->reordered = 0;
-        res  = cuddAddScalarInverseRecur(dd,f,epsilon);
+	dd->reordered = 0;
+	res  = cuddAddScalarInverseRecur(dd,f,epsilon);
     } while (dd->reordered == 1);
+    if (dd->errorCode == CUDD_TIMEOUT_EXPIRED && dd->timeoutHandler) {
+        dd->timeoutHandler(dd, dd->tohArg);
+    }
     return(res);
 
 } /* end of Cudd_addScalarInverse */
@@ -141,17 +126,15 @@ Cudd_addScalarInverse(
 /*---------------------------------------------------------------------------*/
 
 
-/**Function********************************************************************
+/**
+  @brief Performs the recursive step of addScalarInverse.
 
-  Synopsis    [Performs the recursive step of addScalarInverse.]
+  @return a pointer to the resulting %ADD in case of success. Returns
+  NULL if any discriminants smaller than epsilon is encountered.
 
-  Description [Returns a pointer to the resulting ADD in case of
-  success. Returns NULL if any discriminants smaller than epsilon is
-  encountered.]
+  @sideeffect None
 
-  SideEffects [None]
-
-******************************************************************************/
+*/
 DdNode *
 cuddAddScalarInverseRecur(
   DdManager * dd,
@@ -163,14 +146,16 @@ cuddAddScalarInverseRecur(
 
     statLine(dd);
     if (cuddIsConstant(f)) {
-        if (ddAbs(cuddV(f)) < cuddV(epsilon)) return(NULL);
-        value = 1.0 / cuddV(f);
-        res = cuddUniqueConst(dd,value);
-        return(res);
+	if (ddAbs(cuddV(f)) < cuddV(epsilon)) return(NULL);
+	value = 1.0 / cuddV(f);
+	res = cuddUniqueConst(dd,value);
+	return(res);
     }
 
     res = cuddCacheLookup2(dd,Cudd_addScalarInverse,f,epsilon);
     if (res != NULL) return(res);
+
+    checkWhetherToGiveUp(dd);
 
     t = cuddAddScalarInverseRecur(dd,cuddT(f),epsilon);
     if (t == NULL) return(NULL);
@@ -178,16 +163,16 @@ cuddAddScalarInverseRecur(
 
     e = cuddAddScalarInverseRecur(dd,cuddE(f),epsilon);
     if (e == NULL) {
-        Cudd_RecursiveDeref(dd, t);
-        return(NULL);
+	Cudd_RecursiveDeref(dd, t);
+	return(NULL);
     }
     cuddRef(e);
 
     res = (t == e) ? t : cuddUniqueInter(dd,(int)f->index,t,e);
     if (res == NULL) {
-        Cudd_RecursiveDeref(dd, t);
-        Cudd_RecursiveDeref(dd, e);
-        return(NULL);
+	Cudd_RecursiveDeref(dd, t);
+	Cudd_RecursiveDeref(dd, e);
+	return(NULL);
     }
     cuddDeref(t);
     cuddDeref(e);
@@ -203,7 +188,4 @@ cuddAddScalarInverseRecur(
 /* Definition of static functions                                            */
 /*---------------------------------------------------------------------------*/
 
-
 ABC_NAMESPACE_IMPL_END
-
-

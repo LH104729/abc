@@ -1,43 +1,15 @@
-/**CFile***********************************************************************
+/**
+  @file
 
-  FileName    [cuddBridge.c]
+  @ingroup cudd
 
-  PackageName [cudd]
+  @brief Translation from %BDD to %ADD and vice versa and transfer
+  between different managers.
 
-  Synopsis    [Translation from BDD to ADD and vice versa and transfer between
-  different managers.]
+  @author Fabio Somenzi
 
-  Description [External procedures included in this file:
-            <ul>
-            <li> Cudd_addBddThreshold()
-            <li> Cudd_addBddStrictThreshold()
-            <li> Cudd_addBddInterval()
-            <li> Cudd_addBddIthBit()
-            <li> Cudd_BddToAdd()
-            <li> Cudd_addBddPattern()
-            <li> Cudd_bddTransfer()
-            </ul>
-        Internal procedures included in this file:
-            <ul>
-            <li> cuddBddTransfer()
-            <li> cuddAddBddDoPattern()
-            </ul>
-        Static procedures included in this file:
-            <ul>
-            <li> addBddDoThreshold()
-            <li> addBddDoStrictThreshold()
-            <li> addBddDoInterval()
-            <li> addBddDoIthBit()
-            <li> ddBddToAddRecur()
-            <li> cuddBddTransferRecur()
-            </ul>
-            ]
-
-  SeeAlso     []
-
-  Author      [Fabio Somenzi]
-
-  Copyright   [Copyright (c) 1995-2004, Regents of the University of Colorado
+  @copyright@parblock
+  Copyright (c) 1995-2015, Regents of the University of Colorado
 
   All rights reserved.
 
@@ -67,16 +39,15 @@
   CAUSED AND ON ANY THEORY OF LIABILITY, WHETHER IN CONTRACT, STRICT
   LIABILITY, OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN
   ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE
-  POSSIBILITY OF SUCH DAMAGE.]
+  POSSIBILITY OF SUCH DAMAGE.
+  @endparblock
 
-******************************************************************************/
+*/
 
 #include "misc/util/util_hack.h"
 #include "cuddInt.h"
 
 ABC_NAMESPACE_IMPL_START
-
-
 
 /*---------------------------------------------------------------------------*/
 /* Constant declarations                                                     */
@@ -97,16 +68,12 @@ ABC_NAMESPACE_IMPL_START
 /* Variable declarations                                                     */
 /*---------------------------------------------------------------------------*/
 
-#ifndef lint
-static char rcsid[] DD_UNUSED = "$Id: cuddBridge.c,v 1.19 2008/04/25 06:42:55 fabio Exp $";
-#endif
 
 /*---------------------------------------------------------------------------*/
 /* Macro declarations                                                        */
 /*---------------------------------------------------------------------------*/
 
-
-/**AutomaticStart*************************************************************/
+/** \cond */
 
 /*---------------------------------------------------------------------------*/
 /* Static function prototypes                                                */
@@ -119,29 +86,28 @@ static DdNode * addBddDoIthBit (DdManager *dd, DdNode *f, DdNode *index);
 static DdNode * ddBddToAddRecur (DdManager *dd, DdNode *B);
 static DdNode * cuddBddTransferRecur (DdManager *ddS, DdManager *ddD, DdNode *f, st__table *table);
 
-/**AutomaticEnd***************************************************************/
-
+/** \endcond */
 
 /*---------------------------------------------------------------------------*/
 /* Definition of exported functions                                          */
 /*---------------------------------------------------------------------------*/
 
 
-/**Function********************************************************************
+/**
+  @brief Converts an %ADD to a %BDD.
 
-  Synopsis    [Converts an ADD to a BDD.]
+  @details Replaces all discriminants greater than or equal to value
+  with 1, and all other discriminants with 0.
 
-  Description [Converts an ADD to a BDD by replacing all
-  discriminants greater than or equal to value with 1, and all other
-  discriminants with 0. Returns a pointer to the resulting BDD if
-  successful; NULL otherwise.]
+  @return a pointer to the resulting %BDD if successful; NULL
+  otherwise.
 
-  SideEffects [None]
+  @sideeffect None
 
-  SeeAlso     [Cudd_addBddInterval Cudd_addBddPattern Cudd_BddToAdd
-  Cudd_addBddStrictThreshold]
+  @see Cudd_addBddInterval Cudd_addBddPattern Cudd_BddToAdd
+  Cudd_addBddStrictThreshold
 
-******************************************************************************/
+*/
 DdNode *
 Cudd_addBddThreshold(
   DdManager * dd,
@@ -156,13 +122,16 @@ Cudd_addBddThreshold(
     cuddRef(val);
 
     do {
-        dd->reordered = 0;
-        res = addBddDoThreshold(dd, f, val);
+	dd->reordered = 0;
+	res = addBddDoThreshold(dd, f, val);
     } while (dd->reordered == 1);
 
     if (res == NULL) {
-        Cudd_RecursiveDeref(dd, val);
-        return(NULL);
+	Cudd_RecursiveDeref(dd, val);
+        if (dd->errorCode == CUDD_TIMEOUT_EXPIRED && dd->timeoutHandler) {
+            dd->timeoutHandler(dd, dd->tohArg);
+        }
+	return(NULL);
     }
     cuddRef(res);
     Cudd_RecursiveDeref(dd, val);
@@ -172,21 +141,21 @@ Cudd_addBddThreshold(
 } /* end of Cudd_addBddThreshold */
 
 
-/**Function********************************************************************
+/**
+  @brief Converts an %ADD to a %BDD.
 
-  Synopsis    [Converts an ADD to a BDD.]
+  @details Replaces all discriminants STRICTLY greater than value with
+  1, and all other discriminants with 0.
 
-  Description [Converts an ADD to a BDD by replacing all
-  discriminants STRICTLY greater than value with 1, and all other
-  discriminants with 0. Returns a pointer to the resulting BDD if
-  successful; NULL otherwise.]
+  @return a pointer to the resulting %BDD if successful; NULL
+  otherwise.
 
-  SideEffects [None]
+  @sideeffect None
 
-  SeeAlso     [Cudd_addBddInterval Cudd_addBddPattern Cudd_BddToAdd 
-  Cudd_addBddThreshold]
+  @see Cudd_addBddInterval Cudd_addBddPattern Cudd_BddToAdd 
+  Cudd_addBddThreshold
 
-******************************************************************************/
+*/
 DdNode *
 Cudd_addBddStrictThreshold(
   DdManager * dd,
@@ -201,13 +170,16 @@ Cudd_addBddStrictThreshold(
     cuddRef(val);
 
     do {
-        dd->reordered = 0;
-        res = addBddDoStrictThreshold(dd, f, val);
+	dd->reordered = 0;
+	res = addBddDoStrictThreshold(dd, f, val);
     } while (dd->reordered == 1);
 
     if (res == NULL) {
-        Cudd_RecursiveDeref(dd, val);
-        return(NULL);
+	Cudd_RecursiveDeref(dd, val);
+        if (dd->errorCode == CUDD_TIMEOUT_EXPIRED && dd->timeoutHandler) {
+            dd->timeoutHandler(dd, dd->tohArg);
+        }
+	return(NULL);
     }
     cuddRef(res);
     Cudd_RecursiveDeref(dd, val);
@@ -217,21 +189,22 @@ Cudd_addBddStrictThreshold(
 } /* end of Cudd_addBddStrictThreshold */
 
 
-/**Function********************************************************************
+/**
+  @brief Converts an %ADD to a %BDD.
 
-  Synopsis    [Converts an ADD to a BDD.]
+  @details Replaces all discriminants greater than or equal to lower
+  and less than or equal to upper with 1, and all other discriminants
+  with 0.
 
-  Description [Converts an ADD to a BDD by replacing all
-  discriminants greater than or equal to lower and less than or equal to
-  upper with 1, and all other discriminants with 0. Returns a pointer to
-  the resulting BDD if successful; NULL otherwise.]
+  @return a pointer to the resulting %BDD if successful; NULL
+  otherwise.
 
-  SideEffects [None]
+  @sideeffect None
 
-  SeeAlso     [Cudd_addBddThreshold Cudd_addBddStrictThreshold 
-  Cudd_addBddPattern Cudd_BddToAdd]
+  @see Cudd_addBddThreshold Cudd_addBddStrictThreshold 
+  Cudd_addBddPattern Cudd_BddToAdd
 
-******************************************************************************/
+*/
 DdNode *
 Cudd_addBddInterval(
   DdManager * dd,
@@ -251,20 +224,23 @@ Cudd_addBddInterval(
     cuddRef(l);
     u = cuddUniqueConst(dd,upper);
     if (u == NULL) {
-        Cudd_RecursiveDeref(dd,l);
-        return(NULL);
+	Cudd_RecursiveDeref(dd,l);
+	return(NULL);
     }
     cuddRef(u);
 
     do {
-        dd->reordered = 0;
-        res = addBddDoInterval(dd, f, l, u);
+	dd->reordered = 0;
+	res = addBddDoInterval(dd, f, l, u);
     } while (dd->reordered == 1);
 
     if (res == NULL) {
-        Cudd_RecursiveDeref(dd, l);
-        Cudd_RecursiveDeref(dd, u);
-        return(NULL);
+	Cudd_RecursiveDeref(dd, l);
+	Cudd_RecursiveDeref(dd, u);
+        if (dd->errorCode == CUDD_TIMEOUT_EXPIRED && dd->timeoutHandler) {
+            dd->timeoutHandler(dd, dd->tohArg);
+        }
+	return(NULL);
     }
     cuddRef(res);
     Cudd_RecursiveDeref(dd, l);
@@ -275,25 +251,26 @@ Cudd_addBddInterval(
 } /* end of Cudd_addBddInterval */
 
 
-/**Function********************************************************************
+/**
+  @brief Converts an %ADD to a %BDD by extracting the i-th bit from
+  the leaves.
 
-  Synopsis    [Converts an ADD to a BDD by extracting the i-th bit from
-  the leaves.]
-
-  Description [Converts an ADD to a BDD by replacing all
+  @details Converts an %ADD to a %BDD by replacing all
   discriminants whose i-th bit is equal to 1 with 1, and all other
-  discriminants with 0. The i-th bit refers to the integer
-  representation of the leaf value. If the value is has a fractional
-  part, it is ignored. Repeated calls to this procedure allow one to
-  transform an integer-valued ADD into an array of BDDs, one for each
-  bit of the leaf values. Returns a pointer to the resulting BDD if
-  successful; NULL otherwise.]
+  discriminants with 0.  The i-th bit refers to the integer
+  representation of the leaf value.  If the value has a fractional
+  part, it is ignored.  Repeated calls to this procedure allow one to
+  transform an integer-valued %ADD into an array of BDDs, one for each
+  bit of the leaf values.
 
-  SideEffects [None]
+  @return a pointer to the resulting %BDD if successful; NULL
+  otherwise.
 
-  SeeAlso     [Cudd_addBddInterval Cudd_addBddPattern Cudd_BddToAdd]
+  @sideeffect None
 
-******************************************************************************/
+  @see Cudd_addBddInterval Cudd_addBddPattern Cudd_BddToAdd
+
+*/
 DdNode *
 Cudd_addBddIthBit(
   DdManager * dd,
@@ -308,13 +285,16 @@ Cudd_addBddIthBit(
     cuddRef(index);
 
     do {
-        dd->reordered = 0;
-        res = addBddDoIthBit(dd, f, index);
+	dd->reordered = 0;
+	res = addBddDoIthBit(dd, f, index);
     } while (dd->reordered == 1);
 
     if (res == NULL) {
-        Cudd_RecursiveDeref(dd, index);
-        return(NULL);
+	Cudd_RecursiveDeref(dd, index);
+        if (dd->errorCode == CUDD_TIMEOUT_EXPIRED && dd->timeoutHandler) {
+            dd->timeoutHandler(dd, dd->tohArg);
+        }
+	return(NULL);
     }
     cuddRef(res);
     Cudd_RecursiveDeref(dd, index);
@@ -324,19 +304,18 @@ Cudd_addBddIthBit(
 } /* end of Cudd_addBddIthBit */
 
 
-/**Function********************************************************************
+/**
+  @brief Converts a %BDD to a 0-1 %ADD.
 
-  Synopsis    [Converts a BDD to a 0-1 ADD.]
+  @return a pointer to the resulting %ADD if successful; NULL
+  otherwise.
 
-  Description [Converts a BDD to a 0-1 ADD. Returns a pointer to the
-  resulting ADD if successful; NULL otherwise.]
+  @sideeffect None
 
-  SideEffects [None]
+  @see Cudd_addBddPattern Cudd_addBddThreshold Cudd_addBddInterval
+  Cudd_addBddStrictThreshold
 
-  SeeAlso     [Cudd_addBddPattern Cudd_addBddThreshold Cudd_addBddInterval
-  Cudd_addBddStrictThreshold]
-
-******************************************************************************/
+*/
 DdNode *
 Cudd_BddToAdd(
   DdManager * dd,
@@ -345,28 +324,28 @@ Cudd_BddToAdd(
     DdNode *res;
 
     do {
-        dd->reordered = 0;
-        res = ddBddToAddRecur(dd, B);
+	dd->reordered = 0;
+	res = ddBddToAddRecur(dd, B);
     } while (dd->reordered ==1);
     return(res);
 
 } /* end of Cudd_BddToAdd */
 
 
-/**Function********************************************************************
+/**
+  @brief Converts an %ADD to a %BDD.
 
-  Synopsis    [Converts an ADD to a BDD.]
+  @details Replaces all discriminants different from 0 with 1.
 
-  Description [Converts an ADD to a BDD by replacing all
-  discriminants different from 0 with 1. Returns a pointer to the
-  resulting BDD if successful; NULL otherwise.]
+  @return a pointer to the resulting %BDD if successful; NULL
+  otherwise.
 
-  SideEffects [None]
+  @sideeffect None
 
-  SeeAlso     [Cudd_BddToAdd Cudd_addBddThreshold Cudd_addBddInterval
-  Cudd_addBddStrictThreshold]
+  @see Cudd_BddToAdd Cudd_addBddThreshold Cudd_addBddInterval
+  Cudd_addBddStrictThreshold
 
-******************************************************************************/
+*/
 DdNode *
 Cudd_addBddPattern(
   DdManager * dd,
@@ -375,28 +354,29 @@ Cudd_addBddPattern(
     DdNode *res;
     
     do {
-        dd->reordered = 0;
-        res = cuddAddBddDoPattern(dd, f);
+	dd->reordered = 0;
+	res = cuddAddBddDoPattern(dd, f);
     } while (dd->reordered == 1);
+    if (dd->errorCode == CUDD_TIMEOUT_EXPIRED && dd->timeoutHandler) {
+        dd->timeoutHandler(dd, dd->tohArg);
+    }
     return(res);
 
 } /* end of Cudd_addBddPattern */
 
 
-/**Function********************************************************************
+/**
+  @brief Convert a %BDD from a manager to another one.
 
-  Synopsis    [Convert a BDD from a manager to another one.]
+  @details The orders of the variables in the two managers may be
+  different.
 
-  Description [Convert a BDD from a manager to another one. The orders of the
-  variables in the two managers may be different. Returns a
-  pointer to the BDD in the destination manager if successful; NULL
-  otherwise.]
+  @return a pointer to the %BDD in the destination manager if
+  successful; NULL otherwise.
 
-  SideEffects [None]
+  @sideeffect None
 
-  SeeAlso     []
-
-******************************************************************************/
+*/
 DdNode *
 Cudd_bddTransfer(
   DdManager * ddSource,
@@ -405,9 +385,13 @@ Cudd_bddTransfer(
 {
     DdNode *res;
     do {
-        ddDestination->reordered = 0;
-        res = cuddBddTransfer(ddSource, ddDestination, f);
+	ddDestination->reordered = 0;
+	res = cuddBddTransfer(ddSource, ddDestination, f);
     } while (ddDestination->reordered == 1);
+    if (ddDestination->errorCode == CUDD_TIMEOUT_EXPIRED &&
+        ddDestination->timeoutHandler) {
+        ddDestination->timeoutHandler(ddDestination, ddDestination->tohArg);
+    }
     return(res);
 
 } /* end of Cudd_bddTransfer */
@@ -418,19 +402,17 @@ Cudd_bddTransfer(
 /*---------------------------------------------------------------------------*/
 
 
-/**Function********************************************************************
+/**
+  @brief Convert a %BDD from a manager to another one.
 
-  Synopsis    [Convert a BDD from a manager to another one.]
+  @return a pointer to the %BDD in the destination manager if
+  successful; NULL otherwise.
 
-  Description [Convert a BDD from a manager to another one. Returns a
-  pointer to the BDD in the destination manager if successful; NULL
-  otherwise.]
+  @sideeffect None
 
-  SideEffects [None]
+  @see Cudd_bddTransfer
 
-  SeeAlso     [Cudd_bddTransfer]
-
-******************************************************************************/
+*/
 DdNode *
 cuddBddTransfer(
   DdManager * ddS,
@@ -442,7 +424,7 @@ cuddBddTransfer(
     st__generator *gen = NULL;
     DdNode *key, *value;
 
-    table = st__init_table( st__ptrcmp, st__ptrhash);
+    table = st__init_table(st__ptrcmp,st__ptrhash);
     if (table == NULL) goto failure;
     res = cuddBddTransferRecur(ddS, ddD, f, table);
     if (res != NULL) cuddRef(res);
@@ -452,8 +434,8 @@ cuddBddTransfer(
     ** reordering. */
     gen = st__init_gen(table);
     if (gen == NULL) goto failure;
-    while ( st__gen(gen, (const char **)&key, (char **)&value)) {
-        Cudd_RecursiveDeref(ddD, value);
+    while (st__gen(gen, (void **) &key, (void **) &value)) {
+	Cudd_RecursiveDeref(ddD, value);
     }
     st__free_gen(gen); gen = NULL;
     st__free_table(table); table = NULL;
@@ -469,18 +451,15 @@ failure:
 } /* end of cuddBddTransfer */
 
 
-/**Function********************************************************************
+/**
+  @brief Performs the recursive step for Cudd_addBddPattern.
 
-  Synopsis    [Performs the recursive step for Cudd_addBddPattern.]
+  @return a pointer to the resulting %BDD if successful; NULL
+  otherwise.
 
-  Description [Performs the recursive step for Cudd_addBddPattern. Returns a
-  pointer to the resulting BDD if successful; NULL otherwise.]
+  @sideeffect None
 
-  SideEffects [None]
-
-  SeeAlso     []
-
-******************************************************************************/
+*/
 DdNode *
 cuddAddBddDoPattern(
   DdManager * dd,
@@ -488,17 +467,19 @@ cuddAddBddDoPattern(
 {
     DdNode *res, *T, *E;
     DdNode *fv, *fvn;
-    int v;
+    unsigned int v;
 
     statLine(dd);
     /* Check terminal case. */
     if (cuddIsConstant(f)) {
-        return(Cudd_NotCond(DD_ONE(dd),f == DD_ZERO(dd)));
+	return(Cudd_NotCond(DD_ONE(dd),f == DD_ZERO(dd)));
     }
 
     /* Check cache. */
     res = cuddCacheLookup1(dd,Cudd_addBddPattern,f);
     if (res != NULL) return(res);
+
+    checkWhetherToGiveUp(dd);
 
     /* Recursive step. */
     v = f->index;
@@ -510,25 +491,25 @@ cuddAddBddDoPattern(
 
     E = cuddAddBddDoPattern(dd,fvn);
     if (E == NULL) {
-        Cudd_RecursiveDeref(dd, T);
-        return(NULL);
+	Cudd_RecursiveDeref(dd, T);
+	return(NULL);
     }
     cuddRef(E);
     if (Cudd_IsComplement(T)) {
-        res = (T == E) ? Cudd_Not(T) : cuddUniqueInter(dd,v,Cudd_Not(T),Cudd_Not(E));
-        if (res == NULL) {
-            Cudd_RecursiveDeref(dd, T);
-            Cudd_RecursiveDeref(dd, E);
-            return(NULL);
-        }
-        res = Cudd_Not(res);
+	res = (T == E) ? Cudd_Not(T) : cuddUniqueInter(dd,v,Cudd_Not(T),Cudd_Not(E));
+	if (res == NULL) {
+	    Cudd_RecursiveDeref(dd, T);
+	    Cudd_RecursiveDeref(dd, E);
+	    return(NULL);
+	}
+	res = Cudd_Not(res);
     } else {
-        res = (T == E) ? T : cuddUniqueInter(dd,v,T,E);
-        if (res == NULL) {
-            Cudd_RecursiveDeref(dd, T);
-            Cudd_RecursiveDeref(dd, E);
-            return(NULL);
-        }
+	res = (T == E) ? T : cuddUniqueInter(dd,v,T,E);
+	if (res == NULL) {
+	    Cudd_RecursiveDeref(dd, T);
+	    Cudd_RecursiveDeref(dd, E);
+	    return(NULL);
+	}
     }
     cuddDeref(T);
     cuddDeref(E);
@@ -546,18 +527,16 @@ cuddAddBddDoPattern(
 /*---------------------------------------------------------------------------*/
 
 
-/**Function********************************************************************
+/**
+  @brief Performs the recursive step for Cudd_addBddThreshold.
 
-  Synopsis    [Performs the recursive step for Cudd_addBddThreshold.]
+  @return a pointer to the %BDD if successful; NULL otherwise.
 
-  Description [Performs the recursive step for Cudd_addBddThreshold.
-  Returns a pointer to the BDD if successful; NULL otherwise.]
+  @sideeffect None
 
-  SideEffects [None]
+  @see addBddDoStrictThreshold
 
-  SeeAlso     [addBddDoStrictThreshold]
-
-******************************************************************************/
+*/
 static DdNode *
 addBddDoThreshold(
   DdManager * dd,
@@ -566,17 +545,19 @@ addBddDoThreshold(
 {
     DdNode *res, *T, *E;
     DdNode *fv, *fvn;
-    int v;
+    unsigned int v;
 
     statLine(dd);
     /* Check terminal case. */
     if (cuddIsConstant(f)) {
-        return(Cudd_NotCond(DD_ONE(dd),cuddV(f) < cuddV(val)));
+	return(Cudd_NotCond(DD_ONE(dd),cuddV(f) < cuddV(val)));
     }
 
     /* Check cache. */
     res = cuddCacheLookup2(dd,addBddDoThreshold,f,val);
     if (res != NULL) return(res);
+
+    checkWhetherToGiveUp(dd);
 
     /* Recursive step. */
     v = f->index;
@@ -588,25 +569,25 @@ addBddDoThreshold(
 
     E = addBddDoThreshold(dd,fvn,val);
     if (E == NULL) {
-        Cudd_RecursiveDeref(dd, T);
-        return(NULL);
+	Cudd_RecursiveDeref(dd, T);
+	return(NULL);
     }
     cuddRef(E);
     if (Cudd_IsComplement(T)) {
-        res = (T == E) ? Cudd_Not(T) : cuddUniqueInter(dd,v,Cudd_Not(T),Cudd_Not(E));
-        if (res == NULL) {
-            Cudd_RecursiveDeref(dd, T);
-            Cudd_RecursiveDeref(dd, E);
-            return(NULL);
-        }
-        res = Cudd_Not(res);
+	res = (T == E) ? Cudd_Not(T) : cuddUniqueInter(dd,v,Cudd_Not(T),Cudd_Not(E));
+	if (res == NULL) {
+	    Cudd_RecursiveDeref(dd, T);
+	    Cudd_RecursiveDeref(dd, E);
+	    return(NULL);
+	}
+	res = Cudd_Not(res);
     } else {
-        res = (T == E) ? T : cuddUniqueInter(dd,v,T,E);
-        if (res == NULL) {
-            Cudd_RecursiveDeref(dd, T);
-            Cudd_RecursiveDeref(dd, E);
-            return(NULL);
-        }
+	res = (T == E) ? T : cuddUniqueInter(dd,v,T,E);
+	if (res == NULL) {
+	    Cudd_RecursiveDeref(dd, T);
+	    Cudd_RecursiveDeref(dd, E);
+	    return(NULL);
+	}
     }
     cuddDeref(T);
     cuddDeref(E);
@@ -619,18 +600,16 @@ addBddDoThreshold(
 } /* end of addBddDoThreshold */
 
 
-/**Function********************************************************************
+/**
+  @brief Performs the recursive step for Cudd_addBddStrictThreshold.
 
-  Synopsis    [Performs the recursive step for Cudd_addBddStrictThreshold.]
+  @return a pointer to the %BDD if successful; NULL otherwise.
 
-  Description [Performs the recursive step for Cudd_addBddStrictThreshold.
-  Returns a pointer to the BDD if successful; NULL otherwise.]
+  @sideeffect None
 
-  SideEffects [None]
+  @see addBddDoThreshold
 
-  SeeAlso     [addBddDoThreshold]
-
-******************************************************************************/
+*/
 static DdNode *
 addBddDoStrictThreshold(
   DdManager * dd,
@@ -639,17 +618,19 @@ addBddDoStrictThreshold(
 {
     DdNode *res, *T, *E;
     DdNode *fv, *fvn;
-    int v;
+    unsigned int v;
 
     statLine(dd);
     /* Check terminal case. */
     if (cuddIsConstant(f)) {
-        return(Cudd_NotCond(DD_ONE(dd),cuddV(f) <= cuddV(val)));
+	return(Cudd_NotCond(DD_ONE(dd),cuddV(f) <= cuddV(val)));
     }
 
     /* Check cache. */
     res = cuddCacheLookup2(dd,addBddDoStrictThreshold,f,val);
     if (res != NULL) return(res);
+
+    checkWhetherToGiveUp(dd);
 
     /* Recursive step. */
     v = f->index;
@@ -661,25 +642,25 @@ addBddDoStrictThreshold(
 
     E = addBddDoStrictThreshold(dd,fvn,val);
     if (E == NULL) {
-        Cudd_RecursiveDeref(dd, T);
-        return(NULL);
+	Cudd_RecursiveDeref(dd, T);
+	return(NULL);
     }
     cuddRef(E);
     if (Cudd_IsComplement(T)) {
-        res = (T == E) ? Cudd_Not(T) : cuddUniqueInter(dd,v,Cudd_Not(T),Cudd_Not(E));
-        if (res == NULL) {
-            Cudd_RecursiveDeref(dd, T);
-            Cudd_RecursiveDeref(dd, E);
-            return(NULL);
-        }
-        res = Cudd_Not(res);
+	res = (T == E) ? Cudd_Not(T) : cuddUniqueInter(dd,v,Cudd_Not(T),Cudd_Not(E));
+	if (res == NULL) {
+	    Cudd_RecursiveDeref(dd, T);
+	    Cudd_RecursiveDeref(dd, E);
+	    return(NULL);
+	}
+	res = Cudd_Not(res);
     } else {
-        res = (T == E) ? T : cuddUniqueInter(dd,v,T,E);
-        if (res == NULL) {
-            Cudd_RecursiveDeref(dd, T);
-            Cudd_RecursiveDeref(dd, E);
-            return(NULL);
-        }
+	res = (T == E) ? T : cuddUniqueInter(dd,v,T,E);
+	if (res == NULL) {
+	    Cudd_RecursiveDeref(dd, T);
+	    Cudd_RecursiveDeref(dd, E);
+	    return(NULL);
+	}
     }
     cuddDeref(T);
     cuddDeref(E);
@@ -692,18 +673,16 @@ addBddDoStrictThreshold(
 } /* end of addBddDoStrictThreshold */
 
 
-/**Function********************************************************************
+/**
+  @brief Performs the recursive step for Cudd_addBddInterval.
 
-  Synopsis    [Performs the recursive step for Cudd_addBddInterval.]
+  @return a pointer to the %BDD if successful; NULL otherwise.
 
-  Description [Performs the recursive step for Cudd_addBddInterval.
-  Returns a pointer to the BDD if successful; NULL otherwise.]
+  @sideeffect None
 
-  SideEffects [None]
+  @see addBddDoThreshold addBddDoStrictThreshold
 
-  SeeAlso     [addBddDoThreshold addBddDoStrictThreshold]
-
-******************************************************************************/
+*/
 static DdNode *
 addBddDoInterval(
   DdManager * dd,
@@ -713,17 +692,19 @@ addBddDoInterval(
 {
     DdNode *res, *T, *E;
     DdNode *fv, *fvn;
-    int v;
+    unsigned int v;
 
     statLine(dd);
     /* Check terminal case. */
     if (cuddIsConstant(f)) {
-        return(Cudd_NotCond(DD_ONE(dd),cuddV(f) < cuddV(l) || cuddV(f) > cuddV(u)));
+	return(Cudd_NotCond(DD_ONE(dd),cuddV(f) < cuddV(l) || cuddV(f) > cuddV(u)));
     }
 
     /* Check cache. */
     res = cuddCacheLookup(dd,DD_ADD_BDD_DO_INTERVAL_TAG,f,l,u);
     if (res != NULL) return(res);
+
+    checkWhetherToGiveUp(dd);
 
     /* Recursive step. */
     v = f->index;
@@ -735,25 +716,25 @@ addBddDoInterval(
 
     E = addBddDoInterval(dd,fvn,l,u);
     if (E == NULL) {
-        Cudd_RecursiveDeref(dd, T);
-        return(NULL);
+	Cudd_RecursiveDeref(dd, T);
+	return(NULL);
     }
     cuddRef(E);
     if (Cudd_IsComplement(T)) {
-        res = (T == E) ? Cudd_Not(T) : cuddUniqueInter(dd,v,Cudd_Not(T),Cudd_Not(E));
-        if (res == NULL) {
-            Cudd_RecursiveDeref(dd, T);
-            Cudd_RecursiveDeref(dd, E);
-            return(NULL);
-        }
-        res = Cudd_Not(res);
+	res = (T == E) ? Cudd_Not(T) : cuddUniqueInter(dd,v,Cudd_Not(T),Cudd_Not(E));
+	if (res == NULL) {
+	    Cudd_RecursiveDeref(dd, T);
+	    Cudd_RecursiveDeref(dd, E);
+	    return(NULL);
+	}
+	res = Cudd_Not(res);
     } else {
-        res = (T == E) ? T : cuddUniqueInter(dd,v,T,E);
-        if (res == NULL) {
-            Cudd_RecursiveDeref(dd, T);
-            Cudd_RecursiveDeref(dd, E);
-            return(NULL);
-        }
+	res = (T == E) ? T : cuddUniqueInter(dd,v,T,E);
+	if (res == NULL) {
+	    Cudd_RecursiveDeref(dd, T);
+	    Cudd_RecursiveDeref(dd, E);
+	    return(NULL);
+	}
     }
     cuddDeref(T);
     cuddDeref(E);
@@ -766,18 +747,14 @@ addBddDoInterval(
 } /* end of addBddDoInterval */
 
 
-/**Function********************************************************************
+/**
+  @brief Performs the recursive step for Cudd_addBddIthBit.
 
-  Synopsis    [Performs the recursive step for Cudd_addBddIthBit.]
+  @return a pointer to the %BDD if successful; NULL otherwise.
 
-  Description [Performs the recursive step for Cudd_addBddIthBit.
-  Returns a pointer to the BDD if successful; NULL otherwise.]
+  @sideeffect None
 
-  SideEffects [None]
-
-  SeeAlso     []
-
-******************************************************************************/
+*/
 static DdNode *
 addBddDoIthBit(
   DdManager * dd,
@@ -787,19 +764,21 @@ addBddDoIthBit(
     DdNode *res, *T, *E;
     DdNode *fv, *fvn;
     int mask, value;
-    int v;
+    unsigned int v;
 
     statLine(dd);
     /* Check terminal case. */
     if (cuddIsConstant(f)) {
-        mask = 1 << ((int) cuddV(index));
-        value = (int) cuddV(f);
-        return(Cudd_NotCond(DD_ONE(dd),(value & mask) == 0));
+	mask = 1 << ((int) cuddV(index));
+	value = (int) cuddV(f);
+	return(Cudd_NotCond(DD_ONE(dd),(value & mask) == 0));
     }
 
     /* Check cache. */
     res = cuddCacheLookup2(dd,addBddDoIthBit,f,index);
     if (res != NULL) return(res);
+
+    checkWhetherToGiveUp(dd);
 
     /* Recursive step. */
     v = f->index;
@@ -811,25 +790,25 @@ addBddDoIthBit(
 
     E = addBddDoIthBit(dd,fvn,index);
     if (E == NULL) {
-        Cudd_RecursiveDeref(dd, T);
-        return(NULL);
+	Cudd_RecursiveDeref(dd, T);
+	return(NULL);
     }
     cuddRef(E);
     if (Cudd_IsComplement(T)) {
-        res = (T == E) ? Cudd_Not(T) : cuddUniqueInter(dd,v,Cudd_Not(T),Cudd_Not(E));
-        if (res == NULL) {
-            Cudd_RecursiveDeref(dd, T);
-            Cudd_RecursiveDeref(dd, E);
-            return(NULL);
-        }
-        res = Cudd_Not(res);
+	res = (T == E) ? Cudd_Not(T) : cuddUniqueInter(dd,v,Cudd_Not(T),Cudd_Not(E));
+	if (res == NULL) {
+	    Cudd_RecursiveDeref(dd, T);
+	    Cudd_RecursiveDeref(dd, E);
+	    return(NULL);
+	}
+	res = Cudd_Not(res);
     } else {
-        res = (T == E) ? T : cuddUniqueInter(dd,v,T,E);
-        if (res == NULL) {
-            Cudd_RecursiveDeref(dd, T);
-            Cudd_RecursiveDeref(dd, E);
-            return(NULL);
-        }
+	res = (T == E) ? T : cuddUniqueInter(dd,v,T,E);
+	if (res == NULL) {
+	    Cudd_RecursiveDeref(dd, T);
+	    Cudd_RecursiveDeref(dd, E);
+	    return(NULL);
+	}
     }
     cuddDeref(T);
     cuddDeref(E);
@@ -842,18 +821,15 @@ addBddDoIthBit(
 } /* end of addBddDoIthBit */
 
 
-/**Function********************************************************************
+/**
+  @brief Performs the recursive step for Cudd_BddToAdd.
 
-  Synopsis    [Performs the recursive step for Cudd_BddToAdd.]
+  @return a pointer to the resulting %ADD if successful; NULL
+  otherwise.
 
-  Description [Performs the recursive step for Cudd_BddToAdd. Returns a
-  pointer to the resulting ADD if successful; NULL otherwise.]
+  @sideeffect None
 
-  SideEffects [None]
-
-  SeeAlso     []
-
-******************************************************************************/
+*/
 static DdNode *
 ddBddToAddRecur(
   DdManager * dd,
@@ -866,25 +842,27 @@ ddBddToAddRecur(
     statLine(dd);
     one = DD_ONE(dd);
 
-    if (Cudd_IsConstant(B)) {
-        if (B == one) {
-            res = one;
-        } else {
-            res = DD_ZERO(dd);
-        }
-        return(res);
+    if (Cudd_IsConstantInt(B)) {
+	if (B == one) {
+	    res = one;
+	} else {
+	    res = DD_ZERO(dd);
+	}
+	return(res);
     }
     /* Check visited table */
     res = cuddCacheLookup1(dd,ddBddToAddRecur,B);
     if (res != NULL) return(res);
 
+    checkWhetherToGiveUp(dd);
+
     if (Cudd_IsComplement(B)) {
-        complement = 1;
-        Bt = cuddT(Cudd_Regular(B));
-        Be = cuddE(Cudd_Regular(B));
+	complement = 1;
+	Bt = cuddT(Cudd_Regular(B));
+	Be = cuddE(Cudd_Regular(B));
     } else {
-        Bt = cuddT(B);
-        Be = cuddE(B);
+	Bt = cuddT(B);
+	Be = cuddE(B);
     }
 
     T = ddBddToAddRecur(dd, Bt);
@@ -893,32 +871,32 @@ ddBddToAddRecur(
 
     E = ddBddToAddRecur(dd, Be);
     if (E == NULL) {
-        Cudd_RecursiveDeref(dd, T);
-        return(NULL);
+	Cudd_RecursiveDeref(dd, T);
+	return(NULL);
     }
     cuddRef(E);
 
     /* No need to check for T == E, because it is guaranteed not to happen. */
     res = cuddUniqueInter(dd, (int) Cudd_Regular(B)->index, T, E);
     if (res == NULL) {
-        Cudd_RecursiveDeref(dd ,T);
-        Cudd_RecursiveDeref(dd ,E);
-        return(NULL);
+	Cudd_RecursiveDeref(dd ,T);
+	Cudd_RecursiveDeref(dd ,E);
+	return(NULL);
     }
     cuddDeref(T);
     cuddDeref(E);
 
     if (complement) {
-        cuddRef(res);
-        res1 = cuddAddCmplRecur(dd, res);
-        if (res1 == NULL) {
-            Cudd_RecursiveDeref(dd, res);
-            return(NULL);
-        }
-        cuddRef(res1);
-        Cudd_RecursiveDeref(dd, res);
-        res = res1;
-        cuddDeref(res);
+	cuddRef(res);
+	res1 = cuddAddCmplRecur(dd, res);
+	if (res1 == NULL) {
+	    Cudd_RecursiveDeref(dd, res);
+	    return(NULL);
+	}
+	cuddRef(res1);
+	Cudd_RecursiveDeref(dd, res);
+	res = res1;
+	cuddDeref(res);
     }
 
     /* Store result. */
@@ -929,18 +907,16 @@ ddBddToAddRecur(
 } /* end of ddBddToAddRecur */
 
 
-/**Function********************************************************************
+/**
+  @brief Performs the recursive step of Cudd_bddTransfer.
 
-  Synopsis    [Performs the recursive step of Cudd_bddTransfer.]
+  @return a pointer to the result if successful; NULL otherwise.
 
-  Description [Performs the recursive step of Cudd_bddTransfer.
-  Returns a pointer to the result if successful; NULL otherwise.]
+  @sideeffect None
 
-  SideEffects [None]
+  @see cuddBddTransfer
 
-  SeeAlso     [cuddBddTransfer]
-
-******************************************************************************/
+*/
 static DdNode *
 cuddBddTransferRecur(
   DdManager * ddS,
@@ -950,28 +926,23 @@ cuddBddTransferRecur(
 {
     DdNode *ft, *fe, *t, *e, *var, *res;
     DdNode *one, *zero;
-    int    index;
-    int    comple = 0;
+    unsigned int index;
+    int comple = 0;
 
     statLine(ddD);
     one = DD_ONE(ddD);
     comple = Cudd_IsComplement(f);
 
     /* Trivial cases. */
-    if (Cudd_IsConstant(f)) return(Cudd_NotCond(one, comple));
+    if (Cudd_IsConstantInt(f)) return(Cudd_NotCond(one, comple));
 
     /* Make canonical to increase the utilization of the cache. */
     f = Cudd_NotCond(f,comple);
     /* Now f is a regular pointer to a non-constant node. */
 
     /* Check the cache. */
-    if ( st__lookup(table, (const char *)f, (char **)&res))
-        return(Cudd_NotCond(res,comple));
-
-    if ( ddS->TimeStop && Abc_Clock() > ddS->TimeStop )
-        return NULL;
-    if ( ddD->TimeStop && Abc_Clock() > ddD->TimeStop )
-        return NULL;
+    if (st__lookup(table, f, (void **) &res))
+	return(Cudd_NotCond(res,comple));
     
     /* Recursive step. */
     index = f->index;
@@ -979,37 +950,37 @@ cuddBddTransferRecur(
 
     t = cuddBddTransferRecur(ddS, ddD, ft, table);
     if (t == NULL) {
-        return(NULL);
+    	return(NULL);
     }
     cuddRef(t);
 
     e = cuddBddTransferRecur(ddS, ddD, fe, table);
     if (e == NULL) {
-        Cudd_RecursiveDeref(ddD, t);
-        return(NULL);
+    	Cudd_RecursiveDeref(ddD, t);
+    	return(NULL);
     }
     cuddRef(e);
 
     zero = Cudd_Not(one);
     var = cuddUniqueInter(ddD,index,one,zero);
     if (var == NULL) {
-        Cudd_RecursiveDeref(ddD, t);
-        Cudd_RecursiveDeref(ddD, e);
-        return(NULL);
+	Cudd_RecursiveDeref(ddD, t);
+	Cudd_RecursiveDeref(ddD, e);
+    	return(NULL);
     }
     res = cuddBddIteRecur(ddD,var,t,e);
     if (res == NULL) {
-        Cudd_RecursiveDeref(ddD, t);
-        Cudd_RecursiveDeref(ddD, e);
-        return(NULL);
+	Cudd_RecursiveDeref(ddD, t);
+	Cudd_RecursiveDeref(ddD, e);
+	return(NULL);
     }
     cuddRef(res);
     Cudd_RecursiveDeref(ddD, t);
     Cudd_RecursiveDeref(ddD, e);
 
-    if ( st__add_direct(table, (char *) f, (char *) res) == st__OUT_OF_MEM) {
-        Cudd_RecursiveDeref(ddD, res);
-        return(NULL);
+    if (st__add_direct(table, f, res) == st__OUT_OF_MEM) {
+	Cudd_RecursiveDeref(ddD, res);
+	return(NULL);
     }
     return(Cudd_NotCond(res,comple));
 
@@ -1017,5 +988,3 @@ cuddBddTransferRecur(
 
 
 ABC_NAMESPACE_IMPL_END
-
-

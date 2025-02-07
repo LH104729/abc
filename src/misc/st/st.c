@@ -68,6 +68,45 @@ int st__ptrcmp(const char*, const char*);
     return newTable;
 }
 
+
+st__table *
+st__init_table_with_params_and_arg(
+  st__compare_func_arg_type compare,
+  st__hash_func_arg_type hash,
+  char const * arg,
+  int size,
+  int density,
+  double growth_factor,
+  int reorder_flag)
+{
+    st__table *table;
+
+    table = st__init_table_with_params((st__compare_func_type) 0, (st__hash_func_type) 0, size,
+                                      density, growth_factor, reorder_flag);
+    if (table == NIL(st__table))
+        return NIL(st__table);
+    table->compare_arg = compare;
+    table->hash_arg = hash;
+    table->arg = arg;
+
+    return table;
+
+} 
+
+st__table *
+st__init_table_with_arg(
+  st__compare_func_arg_type compare,
+  st__hash_func_arg_type hash,
+  char const * arg)
+{
+    return st__init_table_with_params_and_arg(compare, hash, arg,
+                                             st__DEFAULT_INIT_TABLE_SIZE,
+                                             st__DEFAULT_MAX_DENSITY,
+                                             st__DEFAULT_GROW_FACTOR,
+                                             st__DEFAULT_REORDER_FLAG);
+
+}
+
  st__table *
  st__init_table( st__compare_func_type compare, st__hash_func_type hash)
 {

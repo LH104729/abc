@@ -1,37 +1,14 @@
-/**CFile***********************************************************************
+/**
+  @file
 
-  FileName    [cuddRef.c]
+  @ingroup cudd
 
-  PackageName [cudd]
+  @brief Functions that manipulate the reference counts.
 
-  Synopsis    [Functions that manipulate the reference counts.]
+  @author Fabio Somenzi
 
-  Description [External procedures included in this module:
-                    <ul>
-                    <li> Cudd_Ref()
-                    <li> Cudd_RecursiveDeref()
-                    <li> Cudd_IterDerefBdd()
-                    <li> Cudd_DelayedDerefBdd()
-                    <li> Cudd_RecursiveDerefZdd()
-                    <li> Cudd_Deref()
-                    <li> Cudd_CheckZeroRef()
-                    </ul>
-               Internal procedures included in this module:
-                    <ul>
-                    <li> cuddReclaim()
-                    <li> cuddReclaimZdd()
-                    <li> cuddClearDeathRow()
-                    <li> cuddShrinkDeathRow()
-                    <li> cuddIsInDeathRow()
-                    <li> cuddTimesInDeathRow()
-                    </ul>
-              ]
-
-  SeeAlso     []
-
-  Author      [Fabio Somenzi]
-
-  Copyright   [Copyright (c) 1995-2004, Regents of the University of Colorado
+  @copyright@parblock
+  Copyright (c) 1995-2015, Regents of the University of Colorado
 
   All rights reserved.
 
@@ -61,16 +38,15 @@
   CAUSED AND ON ANY THEORY OF LIABILITY, WHETHER IN CONTRACT, STRICT
   LIABILITY, OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN
   ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE
-  POSSIBILITY OF SUCH DAMAGE.]
+  POSSIBILITY OF SUCH DAMAGE.
+  @endparblock
 
-******************************************************************************/
+*/
 
 #include "misc/util/util_hack.h"
 #include "cuddInt.h"
 
 ABC_NAMESPACE_IMPL_START
-
-
 
 /*---------------------------------------------------------------------------*/
 /* Constant declarations                                                     */
@@ -91,40 +67,33 @@ ABC_NAMESPACE_IMPL_START
 /* Variable declarations                                                     */
 /*---------------------------------------------------------------------------*/
 
-#ifndef lint
-static char rcsid[] DD_UNUSED = "$Id: cuddRef.c,v 1.28 2004/08/13 18:04:50 fabio Exp $";
-#endif
 
 /*---------------------------------------------------------------------------*/
 /* Macro declarations                                                        */
 /*---------------------------------------------------------------------------*/
 
-
-/**AutomaticStart*************************************************************/
+/** \cond */
 
 /*---------------------------------------------------------------------------*/
 /* Static function prototypes                                                */
 /*---------------------------------------------------------------------------*/
 
-/**AutomaticEnd***************************************************************/
+/** \endcond */
 
 
 /*---------------------------------------------------------------------------*/
 /* Definition of exported functions                                          */
 /*---------------------------------------------------------------------------*/
 
-/**Function********************************************************************
+/**
+  @brief Increases the reference count of a node, if it is not
+  saturated.
 
-  Synopsis [Increases the reference count of a node, if it is not
-  saturated.]
+  @sideeffect None
 
-  Description []
+  @see Cudd_RecursiveDeref Cudd_Deref
 
-  SideEffects [None]
-
-  SeeAlso     [Cudd_RecursiveDeref Cudd_Deref]
-
-******************************************************************************/
+*/
 void
 Cudd_Ref(
   DdNode * n)
@@ -137,19 +106,18 @@ Cudd_Ref(
 } /* end of Cudd_Ref */
 
 
-/**Function********************************************************************
+/**
+  @brief Decreases the reference count of node n.
 
-  Synopsis    [Decreases the reference count of node n.]
+  @details If n dies, recursively decreases the reference counts of
+  its children.  It is used to dispose of a DD that is no longer
+  needed.
 
-  Description [Decreases the reference count of node n. If n dies,
-  recursively decreases the reference counts of its children.  It is
-  used to dispose of a DD that is no longer needed.]
+  @sideeffect None
 
-  SideEffects [None]
+  @see Cudd_Deref Cudd_Ref Cudd_RecursiveDerefZdd
 
-  SeeAlso     [Cudd_Deref Cudd_Ref Cudd_RecursiveDerefZdd]
-
-******************************************************************************/
+*/
 void
 Cudd_RecursiveDeref(
   DdManager * table,
@@ -162,57 +130,55 @@ Cudd_RecursiveDeref(
 
     unsigned int live = table->keys - table->dead;
     if (live > table->peakLiveNodes) {
-        table->peakLiveNodes = live;
+	table->peakLiveNodes = live;
     }
 
     N = Cudd_Regular(n);
 
     do {
 #ifdef DD_DEBUG
-        assert(N->ref != 0);
+	assert(N->ref != 0);
 #endif
 
-        if (N->ref == 1) {
-            N->ref = 0;
-            table->dead++;
+	if (N->ref == 1) {
+	    N->ref = 0;
+	    table->dead++;
 #ifdef DD_STATS
-            table->nodesDropped++;
+	    table->nodesDropped++;
 #endif
-            if (cuddIsConstant(N)) {
-                table->constants.dead++;
-                N = stack[--SP];
-            } else {
-                ord = table->perm[N->index];
-                stack[SP++] = Cudd_Regular(cuddE(N));
-                table->subtables[ord].dead++;
-                N = cuddT(N);
-            }
-        } else {
-            cuddSatDec(N->ref);
-            N = stack[--SP];
-        }
+	    if (cuddIsConstant(N)) {
+		table->constants.dead++;
+		N = stack[--SP];
+	    } else {
+		ord = table->perm[N->index];
+		stack[SP++] = Cudd_Regular(cuddE(N));
+		table->subtables[ord].dead++;
+		N = cuddT(N);
+	    }
+	} else {
+	    cuddSatDec(N->ref);
+	    N = stack[--SP];
+	}
     } while (SP != 0);
 
 } /* end of Cudd_RecursiveDeref */
 
 
-/**Function********************************************************************
+/**
+  @brief Decreases the reference count of %BDD node n.
 
-  Synopsis    [Decreases the reference count of BDD node n.]
+  @details If n dies, recursively decreases the reference counts of
+  its children.  It is used to dispose of a %BDD that is no longer
+  needed. It is more efficient than Cudd_RecursiveDeref, but it cannot
+  be used on ADDs. The greater efficiency comes from being able to
+  assume that no constant node will ever die as a result of a call to
+  this procedure.
 
-  Description [Decreases the reference count of node n. If n dies,
-  recursively decreases the reference counts of its children.  It is
-  used to dispose of a BDD that is no longer needed. It is more
-  efficient than Cudd_RecursiveDeref, but it cannot be used on
-  ADDs. The greater efficiency comes from being able to assume that no
-  constant node will ever die as a result of a call to this
-  procedure.]
+  @sideeffect None
 
-  SideEffects [None]
+  @see Cudd_RecursiveDeref Cudd_DelayedDerefBdd
 
-  SeeAlso     [Cudd_RecursiveDeref Cudd_DelayedDerefBdd]
-
-******************************************************************************/
+*/
 void
 Cudd_IterDerefBdd(
   DdManager * table,
@@ -225,51 +191,50 @@ Cudd_IterDerefBdd(
 
     unsigned int live = table->keys - table->dead;
     if (live > table->peakLiveNodes) {
-        table->peakLiveNodes = live;
+	table->peakLiveNodes = live;
     }
 
     N = Cudd_Regular(n);
 
     do {
 #ifdef DD_DEBUG
-        assert(N->ref != 0);
+	assert(N->ref != 0);
 #endif
 
-        if (N->ref == 1) {
-            N->ref = 0;
-            table->dead++;
+	if (N->ref == 1) {
+	    N->ref = 0;
+	    table->dead++;
 #ifdef DD_STATS
-            table->nodesDropped++;
+	    table->nodesDropped++;
 #endif
-            ord = table->perm[N->index];
-            stack[SP++] = Cudd_Regular(cuddE(N));
-            table->subtables[ord].dead++;
-            N = cuddT(N);
-        } else {
-            cuddSatDec(N->ref);
-            N = stack[--SP];
-        }
+	    ord = table->perm[N->index];
+	    stack[SP++] = Cudd_Regular(cuddE(N));
+	    table->subtables[ord].dead++;
+	    N = cuddT(N);
+	} else {
+	    cuddSatDec(N->ref);
+	    N = stack[--SP];
+	}
     } while (SP != 0);
 
 } /* end of Cudd_IterDerefBdd */
 
 
-/**Function********************************************************************
+/**
+  @brief Decreases the reference count of %BDD node n.
 
-  Synopsis    [Decreases the reference count of BDD node n.]
-
-  Description [Enqueues node n for later dereferencing. If the queue
+  @details Enqueues node n for later dereferencing. If the queue
   is full decreases the reference count of the oldest node N to make
   room for n. If N dies, recursively decreases the reference counts of
-  its children.  It is used to dispose of a BDD that is currently not
+  its children.  It is used to dispose of a %BDD that is currently not
   needed, but may be useful again in the near future. The dereferencing
-  proper is done as in Cudd_IterDerefBdd.]
+  proper is done as in Cudd_IterDerefBdd.
 
-  SideEffects [None]
+  @sideeffect None
 
-  SeeAlso     [Cudd_RecursiveDeref Cudd_IterDerefBdd]
+  @see Cudd_RecursiveDeref Cudd_IterDerefBdd
 
-******************************************************************************/
+*/
 void
 Cudd_DelayedDerefBdd(
   DdManager * table,
@@ -282,7 +247,7 @@ Cudd_DelayedDerefBdd(
 
     unsigned int live = table->keys - table->dead;
     if (live > table->peakLiveNodes) {
-        table->peakLiveNodes = live;
+	table->peakLiveNodes = live;
     }
 
     n = Cudd_Regular(n);
@@ -295,10 +260,10 @@ Cudd_DelayedDerefBdd(
 #else
     if (cuddIsConstant(n) || n->ref > 1) {
 #ifdef DD_DEBUG
-        assert(n->ref != 1 && (!cuddIsConstant(n) || n == DD_ONE(table)));
+	assert(n->ref != 1 && (!cuddIsConstant(n) || n == DD_ONE(table)));
 #endif
-        cuddSatDec(n->ref);
-        return;
+	cuddSatDec(n->ref);
+	return;
     }
 
     N = table->deathRow[table->nextDead];
@@ -306,29 +271,29 @@ Cudd_DelayedDerefBdd(
     if (N != NULL) {
 #endif
 #ifdef DD_DEBUG
-        assert(!Cudd_IsComplement(N));
+	assert(!Cudd_IsComplement(N));
 #endif
-        stack = table->stack;
-        SP = 1;
-        do {
+	stack = table->stack;
+	SP = 1;
+	do {
 #ifdef DD_DEBUG
-            assert(N->ref != 0);
+	    assert(N->ref != 0);
 #endif
-            if (N->ref == 1) {
-                N->ref = 0;
-                table->dead++;
+	    if (N->ref == 1) {
+		N->ref = 0;
+		table->dead++;
 #ifdef DD_STATS
-                table->nodesDropped++;
+		table->nodesDropped++;
 #endif
-                ord = table->perm[N->index];
-                stack[SP++] = Cudd_Regular(cuddE(N));
-                table->subtables[ord].dead++;
-                N = cuddT(N);
-            } else {
-                cuddSatDec(N->ref);
-                N = stack[--SP];
-            }
-        } while (SP != 0);
+		ord = table->perm[N->index];
+		stack[SP++] = Cudd_Regular(cuddE(N));
+		table->subtables[ord].dead++;
+		N = cuddT(N);
+	    } else {
+		cuddSatDec(N->ref);
+		N = stack[--SP];
+	    }
+	} while (SP != 0);
 #ifndef DD_NO_DEATH_ROW
     }
     table->deathRow[table->nextDead] = n;
@@ -338,29 +303,29 @@ Cudd_DelayedDerefBdd(
     table->nextDead &= table->deadMask;
 #if 0
     if (table->nextDead == table->deathRowDepth) {
-        if (table->deathRowDepth < table->looseUpTo / 2) {
-            extern void (*MMoutOfMemory)(long);
-            void (*saveHandler)(long) = MMoutOfMemory;
-            DdNodePtr *newRow;
-            MMoutOfMemory = Cudd_OutOfMem;
-            newRow = ABC_REALLOC(DdNodePtr,table->deathRow,2*table->deathRowDepth);
-            MMoutOfMemory = saveHandler;
-            if (newRow == NULL) {
-                table->nextDead = 0;
-            } else {
-                int i;
-                table->memused += table->deathRowDepth;
-                i = table->deathRowDepth;
-                table->deathRowDepth <<= 1;
-                for (; i < table->deathRowDepth; i++) {
-                    newRow[i] = NULL;
-                }
-                table->deadMask = table->deathRowDepth - 1;
-                table->deathRow = newRow;
-            }
-        } else {
-            table->nextDead = 0;
-        }
+	if (table->deathRowDepth < table->looseUpTo / 2) {
+	    extern void (*MMoutOfMemory)(size_t);
+	    void (*saveHandler)(size_t) = MMoutOfMemory;
+	    DdNodePtr *newRow;
+	    MMoutOfMemory = table->outOfMemCallback;
+	    newRow = REALLOC(DdNodePtr,table->deathRow,2*table->deathRowDepth);
+	    MMoutOfMemory = saveHandler;
+	    if (newRow == NULL) {
+		table->nextDead = 0;
+	    } else {
+		int i;
+		table->memused += table->deathRowDepth;
+		i = table->deathRowDepth;
+		table->deathRowDepth <<= 1;
+		for (; i < table->deathRowDepth; i++) {
+		    newRow[i] = NULL;
+		}
+		table->deadMask = table->deathRowDepth - 1;
+		table->deathRow = newRow;
+	    }
+	} else {
+	    table->nextDead = 0;
+	}
     }
 #endif
 #endif
@@ -368,19 +333,18 @@ Cudd_DelayedDerefBdd(
 } /* end of Cudd_DelayedDerefBdd */
 
 
-/**Function********************************************************************
+/**
+  @brief Decreases the reference count of %ZDD node n.
 
-  Synopsis    [Decreases the reference count of ZDD node n.]
+  @details If n dies, recursively decreases the reference counts of
+  its children.  It is used to dispose of a %ZDD that is no longer
+  needed.
 
-  Description [Decreases the reference count of ZDD node n. If n dies,
-  recursively decreases the reference counts of its children.  It is
-  used to dispose of a ZDD that is no longer needed.]
+  @sideeffect None
 
-  SideEffects [None]
+  @see Cudd_Deref Cudd_Ref Cudd_RecursiveDeref
 
-  SeeAlso     [Cudd_Deref Cudd_Ref Cudd_RecursiveDeref]
-
-******************************************************************************/
+*/
 void
 Cudd_RecursiveDerefZdd(
   DdManager * table,
@@ -395,45 +359,44 @@ Cudd_RecursiveDerefZdd(
 
     do {
 #ifdef DD_DEBUG
-        assert(N->ref != 0);
+	assert(N->ref != 0);
 #endif
 
-        cuddSatDec(N->ref);
+	cuddSatDec(N->ref);
     
-        if (N->ref == 0) {
-            table->deadZ++;
+	if (N->ref == 0) {
+	    table->deadZ++;
 #ifdef DD_STATS
-            table->nodesDropped++;
+	    table->nodesDropped++;
 #endif
 #ifdef DD_DEBUG
-            assert(!cuddIsConstant(N));
+	    assert(!cuddIsConstant(N));
 #endif
-            ord = table->permZ[N->index];
-            stack[SP++] = cuddE(N);
-            table->subtableZ[ord].dead++;
-            N = cuddT(N);
-        } else {
-            N = stack[--SP];
-        }
+	    ord = table->permZ[N->index];
+	    stack[SP++] = cuddE(N);
+	    table->subtableZ[ord].dead++;
+	    N = cuddT(N);
+	} else {
+	    N = stack[--SP];
+	}
     } while (SP != 0);
 
 } /* end of Cudd_RecursiveDerefZdd */
 
 
-/**Function********************************************************************
+/**
+  @brief Decreases the reference count of node.
 
-  Synopsis    [Decreases the reference count of node.]
+  @details It is primarily used in recursive procedures to decrease
+  the ref count of a result node before returning it. This
+  accomplishes the goal of removing the protection applied by a
+  previous Cudd_Ref.
 
-  Description [Decreases the reference count of node. It is primarily
-  used in recursive procedures to decrease the ref count of a result
-  node before returning it. This accomplishes the goal of removing the
-  protection applied by a previous Cudd_Ref.]
+  @sideeffect None
 
-  SideEffects [None]
+  @see Cudd_RecursiveDeref Cudd_RecursiveDerefZdd Cudd_Ref
 
-  SeeAlso     [Cudd_RecursiveDeref Cudd_RecursiveDerefZdd Cudd_Ref]
-
-******************************************************************************/
+*/
 void
 Cudd_Deref(
   DdNode * node)
@@ -444,31 +407,29 @@ Cudd_Deref(
 } /* end of Cudd_Deref */
 
 
-/**Function********************************************************************
+/**
+  @brief Checks the unique table for nodes with non-zero reference
+  counts.
 
-  Synopsis [Checks the unique table for nodes with non-zero reference
-  counts.]
-
-  Description [Checks the unique table for nodes with non-zero
-  reference counts. It is normally called before Cudd_Quit to make sure
-  that there are no memory leaks due to missing Cudd_RecursiveDeref's.
+  @details It is normally called before Cudd_Quit to make sure that
+  there are no memory leaks due to missing Cudd_RecursiveDeref's.
   Takes into account that reference counts may saturate and that the
   basic constants and the projection functions are referenced by the
-  manager.  Returns the number of nodes with non-zero reference count.
-  (Except for the cases mentioned above.)]
+  manager.
 
-  SideEffects [None]
+  @return the number of nodes with non-zero reference count.
+  (Except for the cases mentioned above.)
 
-  SeeAlso     []
+  @sideeffect None
 
-******************************************************************************/
+*/
 int
 Cudd_CheckZeroRef(
   DdManager * manager)
 {
     int size;
     int i, j;
-    int remain; /* the expected number of remaining references to one */
+    int remain;	/* the expected number of remaining references to one */
     DdNodePtr *nodelist;
     DdNode *node;
     DdNode *sentinel = &(manager->sentinel);
@@ -483,53 +444,53 @@ Cudd_CheckZeroRef(
     /* First look at the BDD/ADD subtables. */
     remain = 1; /* reference from the manager */
     size = manager->size;
-    remain += 2 * size; /* reference from the BDD projection functions */
+    remain += 2 * size;	/* reference from the BDD projection functions */
 
     for (i = 0; i < size; i++) {
-        subtable = &(manager->subtables[i]);
-        nodelist = subtable->nodelist;
-        for (j = 0; (unsigned) j < subtable->slots; j++) {
-            node = nodelist[j];
-            while (node != sentinel) {
-                if (node->ref != 0 && node->ref != DD_MAXREF) {
-                    index = (int) node->index;
-                    if (node != manager->vars[index]) {
-                        count++;
-                    } else {
-                        if (node->ref != 1) {
-                            count++;
-                        }
-                    }
-                }
-                node = node->next;
-            }
-        }
+	subtable = &(manager->subtables[i]);
+	nodelist = subtable->nodelist;
+	for (j = 0; (unsigned) j < subtable->slots; j++) {
+	    node = nodelist[j];
+	    while (node != sentinel) {
+		if (node->ref != 0 && node->ref != DD_MAXREF) {
+		    index = (int) node->index;
+		    if (node != manager->vars[index]) {
+			count++;
+		    } else {
+			if (node->ref != 1) {
+			    count++;
+			}
+		    }
+		}
+		node = node->next;
+	    }
+	}
     }
 
     /* Then look at the ZDD subtables. */
     size = manager->sizeZ;
     if (size) /* references from ZDD universe */
-        remain += 2;
+	remain += 2;
 
     for (i = 0; i < size; i++) {
-        subtable = &(manager->subtableZ[i]);
-        nodelist = subtable->nodelist;
-        for (j = 0; (unsigned) j < subtable->slots; j++) {
-            node = nodelist[j];
-            while (node != NULL) {
-                if (node->ref != 0 && node->ref != DD_MAXREF) {
-                    index = (int) node->index;
-                    if (node == manager->univ[manager->permZ[index]]) {
-                        if (node->ref > 2) {
-                            count++;
-                        }
-                    } else {
-                        count++;
-                    }
-                }
-                node = node->next;
-            }
-        }
+	subtable = &(manager->subtableZ[i]);
+	nodelist = subtable->nodelist;
+	for (j = 0; (unsigned) j < subtable->slots; j++) {
+	    node = nodelist[j];
+	    while (node != NULL) {
+		if (node->ref != 0 && node->ref != DD_MAXREF) {
+		    index = (int) node->index;
+		    if (node == manager->univ[manager->permZ[index]]) {
+			if (node->ref > 2) {
+			    count++;
+			}
+		    } else {
+			count++;
+		    }
+		}
+		node = node->next;
+	    }
+	}
     }
 
     /* Now examine the constant table. Plusinfinity, minusinfinity, and
@@ -539,25 +500,25 @@ Cudd_CheckZeroRef(
     */
     nodelist = manager->constants.nodelist;
     for (j = 0; (unsigned) j < manager->constants.slots; j++) {
-        node = nodelist[j];
-        while (node != NULL) {
-            if (node->ref != 0 && node->ref != DD_MAXREF) {
-                if (node == manager->one) {
-                    if ((int) node->ref != remain) {
-                        count++;
-                    }
-                } else if (node == manager->zero ||
-                node == manager->plusinfinity ||
-                node == manager->minusinfinity) {
-                    if (node->ref != 1) {
-                        count++;
-                    }
-                } else {
-                    count++;
-                }
-            }
-            node = node->next;
-        }
+	node = nodelist[j];
+	while (node != NULL) {
+	    if (node->ref != 0 && node->ref != DD_MAXREF) {
+		if (node == manager->one) {
+		    if ((int) node->ref != remain) {
+			count++;
+		    }
+		} else if (node == manager->zero ||
+		node == manager->plusinfinity ||
+		node == manager->minusinfinity) {
+		    if (node->ref != 1) {
+			count++;
+		    }
+		} else {
+		    count++;
+		}
+	    }
+	    node = node->next;
+	}
     }
     return(count);
 
@@ -569,17 +530,14 @@ Cudd_CheckZeroRef(
 /*---------------------------------------------------------------------------*/
 
 
-/**Function********************************************************************
+/**
+  @brief Brings children of a dead node back.
 
-  Synopsis    [Brings children of a dead node back.]
+  @sideeffect None
 
-  Description []
+  @see cuddReclaimZdd
 
-  SideEffects [None]
-
-  SeeAlso     [cuddReclaimZdd]
-
-******************************************************************************/
+*/
 void
 cuddReclaim(
   DdManager * table,
@@ -598,22 +556,22 @@ cuddReclaim(
 #endif
 
     do {
-        if (N->ref == 0) {
-            N->ref = 1;
-            table->dead--;
-            if (cuddIsConstant(N)) {
-                table->constants.dead--;
-                N = stack[--SP];
-            } else {
-                ord = table->perm[N->index];
-                stack[SP++] = Cudd_Regular(cuddE(N));
-                table->subtables[ord].dead--;
-                N = cuddT(N);
-            }
-        } else {
-            cuddSatInc(N->ref);
-            N = stack[--SP];
-        }
+	if (N->ref == 0) {
+	    N->ref = 1;
+	    table->dead--;
+	    if (cuddIsConstant(N)) {
+		table->constants.dead--;
+		N = stack[--SP];
+	    } else {
+		ord = table->perm[N->index];
+		stack[SP++] = Cudd_Regular(cuddE(N));
+		table->subtables[ord].dead--;
+		N = cuddT(N);
+	    }
+	} else {
+	    cuddSatInc(N->ref);
+	    N = stack[--SP];
+	}
     } while (SP != 0);
 
     N = Cudd_Regular(n);
@@ -623,17 +581,14 @@ cuddReclaim(
 } /* end of cuddReclaim */
 
 
-/**Function********************************************************************
+/**
+  @brief Brings children of a dead %ZDD node back.
 
-  Synopsis    [Brings children of a dead ZDD node back.]
+  @sideeffect None
 
-  Description []
+  @see cuddReclaim
 
-  SideEffects [None]
-
-  SeeAlso     [cuddReclaim]
-
-******************************************************************************/
+*/
 void
 cuddReclaimZdd(
   DdManager * table,
@@ -651,21 +606,21 @@ cuddReclaimZdd(
 #endif
 
     do {
-        cuddSatInc(N->ref);
+	cuddSatInc(N->ref);
 
-        if (N->ref == 1) {
-            table->deadZ--;
-            table->reclaimed++;
+	if (N->ref == 1) {
+	    table->deadZ--;
+	    table->reclaimed++;
 #ifdef DD_DEBUG
-            assert(!cuddIsConstant(N));
+	    assert(!cuddIsConstant(N));
 #endif
-            ord = table->permZ[N->index];
-            stack[SP++] = cuddE(N);
-            table->subtableZ[ord].dead--;
-            N = cuddT(N);
-        } else {
-            N = stack[--SP];
-        }
+	    ord = table->permZ[N->index];
+	    stack[SP++] = cuddE(N);
+	    table->subtableZ[ord].dead--;
+	    N = cuddT(N);
+	} else {
+	    N = stack[--SP];
+	}
     } while (SP != 0);
 
     cuddSatDec(n->ref);
@@ -673,17 +628,16 @@ cuddReclaimZdd(
 } /* end of cuddReclaimZdd */
 
 
-/**Function********************************************************************
+/**
+  @brief Shrinks the death row.
 
-  Synopsis    [Shrinks the death row.]
+  @details Shrinks the death row by a factor of four.
 
-  Description [Shrinks the death row by a factor of four.]
+  @sideeffect None
 
-  SideEffects [None]
+  @see cuddClearDeathRow
 
-  SeeAlso     [cuddClearDeathRow]
-
-******************************************************************************/
+*/
 void
 cuddShrinkDeathRow(
   DdManager *table)
@@ -692,36 +646,33 @@ cuddShrinkDeathRow(
     int i;
 
     if (table->deathRowDepth > 3) {
-        for (i = table->deathRowDepth/4; i < table->deathRowDepth; i++) {
-            if (table->deathRow[i] == NULL) break;
-            Cudd_IterDerefBdd(table,table->deathRow[i]);
-            table->deathRow[i] = NULL;
-        }
-        table->deathRowDepth /= 4;
-        table->deadMask = table->deathRowDepth - 1;
-        if ((unsigned) table->nextDead > table->deadMask) {
-            table->nextDead = 0;
-        }
-        table->deathRow = ABC_REALLOC(DdNodePtr, table->deathRow,
-                                   table->deathRowDepth);
+	for (i = table->deathRowDepth/4; i < table->deathRowDepth; i++) {
+	    if (table->deathRow[i] == NULL) break;
+	    Cudd_IterDerefBdd(table,table->deathRow[i]);
+	    table->deathRow[i] = NULL;
+	}
+	table->deathRowDepth /= 4;
+	table->deadMask = table->deathRowDepth - 1;
+	if ((unsigned) table->nextDead > table->deadMask) {
+	    table->nextDead = 0;
+	}
+	table->deathRow = REALLOC(DdNodePtr, table->deathRow,
+				   table->deathRowDepth);
     }
 #endif
 
 } /* end of cuddShrinkDeathRow */
 
 
-/**Function********************************************************************
+/**
+  @brief Clears the death row.
 
-  Synopsis    [Clears the death row.]
+  @sideeffect None
 
-  Description []
+  @see Cudd_DelayedDerefBdd Cudd_IterDerefBdd Cudd_CheckZeroRef
+  cuddGarbageCollect
 
-  SideEffects [None]
-
-  SeeAlso     [Cudd_DelayedDerefBdd Cudd_IterDerefBdd Cudd_CheckZeroRef
-  cuddGarbageCollect]
-
-******************************************************************************/
+*/
 void
 cuddClearDeathRow(
   DdManager *table)
@@ -730,13 +681,13 @@ cuddClearDeathRow(
     int i;
 
     for (i = 0; i < table->deathRowDepth; i++) {
-        if (table->deathRow[i] == NULL) break;
-        Cudd_IterDerefBdd(table,table->deathRow[i]);
-        table->deathRow[i] = NULL;
+	if (table->deathRow[i] == NULL) break;
+	Cudd_IterDerefBdd(table,table->deathRow[i]);
+	table->deathRow[i] = NULL;
     }
 #ifdef DD_DEBUG
     for (; i < table->deathRowDepth; i++) {
-        assert(table->deathRow[i] == NULL);
+	assert(table->deathRow[i] == NULL);
     }
 #endif
     table->nextDead = 0;
@@ -745,19 +696,17 @@ cuddClearDeathRow(
 } /* end of cuddClearDeathRow */
 
 
-/**Function********************************************************************
+/**
+  @brief Checks whether a node is in the death row.
 
-  Synopsis    [Checks whether a node is in the death row.]
+  @return the position of the first occurrence if the node is present;
+  -1 otherwise.
 
-  Description [Checks whether a node is in the death row. Returns the
-  position of the first occurrence if the node is present; -1
-  otherwise.]
+  @sideeffect None
 
-  SideEffects [None]
+  @see Cudd_DelayedDerefBdd cuddClearDeathRow
 
-  SeeAlso     [Cudd_DelayedDerefBdd cuddClearDeathRow]
-
-******************************************************************************/
+*/
 int
 cuddIsInDeathRow(
   DdManager *dd,
@@ -767,9 +716,9 @@ cuddIsInDeathRow(
     int i;
 
     for (i = 0; i < dd->deathRowDepth; i++) {
-        if (f == dd->deathRow[i]) {
-            return(i);
-        }
+	if (f == dd->deathRow[i]) {
+	    return(i);
+	}
     }
 #endif
 
@@ -778,17 +727,14 @@ cuddIsInDeathRow(
 } /* end of cuddIsInDeathRow */
 
 
-/**Function********************************************************************
+/**
+  @brief Counts how many times a node is in the death row.
 
-  Synopsis    [Counts how many times a node is in the death row.]
+  @sideeffect None
 
-  Description []
+  @see Cudd_DelayedDerefBdd cuddClearDeathRow cuddIsInDeathRow
 
-  SideEffects [None]
-
-  SeeAlso     [Cudd_DelayedDerefBdd cuddClearDeathRow cuddIsInDeathRow]
-
-******************************************************************************/
+*/
 int
 cuddTimesInDeathRow(
   DdManager *dd,
@@ -799,7 +745,7 @@ cuddTimesInDeathRow(
     int i;
 
     for (i = 0; i < dd->deathRowDepth; i++) {
-        count += f == dd->deathRow[i];
+	count += f == dd->deathRow[i];
     }
 #endif
 
@@ -811,6 +757,4 @@ cuddTimesInDeathRow(
 /* Definition of static functions                                            */
 /*---------------------------------------------------------------------------*/
 
-
 ABC_NAMESPACE_IMPL_END
-

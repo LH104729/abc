@@ -1,35 +1,14 @@
-/**CFile***********************************************************************
+/**
+  @file
 
-  FileName    [cuddCache.c]
+  @ingroup cudd
 
-  PackageName [cudd]
+  @brief Functions for cache insertion and lookup.
 
-  Synopsis    [Functions for cache insertion and lookup.]
+  @author Fabio Somenzi
 
-  Description [Internal procedures included in this module:
-                <ul>
-                <li> cuddInitCache()
-                <li> cuddCacheInsert()
-                <li> cuddCacheInsert2()
-                <li> cuddCacheLookup()
-                <li> cuddCacheLookupZdd()
-                <li> cuddCacheLookup2()
-                <li> cuddCacheLookup2Zdd()
-                <li> cuddConstantLookup()
-                <li> cuddCacheProfile()
-                <li> cuddCacheResize()
-                <li> cuddCacheFlush()
-                <li> cuddComputeFloorLog2()
-                </ul>
-            Static procedures included in this module:
-                <ul>
-                </ul> ]
-
-  SeeAlso     []
-
-  Author      [Fabio Somenzi]
-
-  Copyright   [Copyright (c) 1995-2004, Regents of the University of Colorado
+  @copyright@parblock
+  Copyright (c) 1995-2015, Regents of the University of Colorado
 
   All rights reserved.
 
@@ -59,16 +38,15 @@
   CAUSED AND ON ANY THEORY OF LIABILITY, WHETHER IN CONTRACT, STRICT
   LIABILITY, OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN
   ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE
-  POSSIBILITY OF SUCH DAMAGE.]
+  POSSIBILITY OF SUCH DAMAGE.
+  @endparblock
 
-******************************************************************************/
+*/
 
 #include "misc/util/util_hack.h"
 #include "cuddInt.h"
 
 ABC_NAMESPACE_IMPL_START
-
-
 
 /*---------------------------------------------------------------------------*/
 /* Constant declarations                                                     */
@@ -92,23 +70,18 @@ ABC_NAMESPACE_IMPL_START
 /* Variable declarations                                                     */
 /*---------------------------------------------------------------------------*/
 
-#ifndef lint
-static char rcsid[] DD_UNUSED = "$Id: cuddCache.c,v 1.34 2009/02/19 16:17:50 fabio Exp $";
-#endif
 
 /*---------------------------------------------------------------------------*/
 /* Macro declarations                                                        */
 /*---------------------------------------------------------------------------*/
 
-
-/**AutomaticStart*************************************************************/
+/** \cond */
 
 /*---------------------------------------------------------------------------*/
 /* Static function prototypes                                                */
 /*---------------------------------------------------------------------------*/
 
-
-/**AutomaticEnd***************************************************************/
+/** \endcond */
 
 
 /*---------------------------------------------------------------------------*/
@@ -120,23 +93,23 @@ static char rcsid[] DD_UNUSED = "$Id: cuddCache.c,v 1.34 2009/02/19 16:17:50 fab
 /*---------------------------------------------------------------------------*/
 
 
-/**Function********************************************************************
+/**
+  @brief Initializes the computed table.
 
-  Synopsis    [Initializes the computed table.]
+  @details It is called by Cudd_Init.
 
-  Description [Initializes the computed table. It is called by
-  Cudd_Init. Returns 1 in case of success; 0 otherwise.]
+  @return 1 in case of success; 0 otherwise.
 
-  SideEffects [None]
+  @sideeffect None
 
-  SeeAlso     [Cudd_Init]
+  @see Cudd_Init
 
-******************************************************************************/
+*/
 int
 cuddInitCache(
-  DdManager * unique /* unique table */,
-  unsigned int cacheSize /* initial size of the cache */,
-  unsigned int maxCacheSize /* cache size beyond which no resizing occurs */)
+  DdManager * unique /**< unique table */,
+  unsigned int cacheSize /**< initial size of the cache */,
+  unsigned int maxCacheSize /**< cache size beyond which no resizing occurs */)
 {
     int i;
     unsigned int logSize;
@@ -148,12 +121,11 @@ cuddInitCache(
     /* Round cacheSize to largest power of 2 not greater than the requested
     ** initial cache size. */
     logSize = cuddComputeFloorLog2(ddMax(cacheSize,unique->slots/2));
-    cacheSize = 1 << logSize;
-//    unique->acache = ABC_ALLOC(DdCache,cacheSize+1);
-    unique->acache = ABC_ALLOC(DdCache,cacheSize+2);
+    cacheSize = 1U << logSize;
+    unique->acache = ALLOC(DdCache,cacheSize+1);
     if (unique->acache == NULL) {
-        unique->errorCode = CUDD_MEMORY_OUT;
-        return(0);
+	unique->errorCode = CUDD_MEMORY_OUT;
+	return(0);
     }
     /* If the size of the cache entry is a power of 2, we want to
     ** enforce alignment to that power of two. This happens when
@@ -163,13 +135,10 @@ cuddInitCache(
     unique->memused += (cacheSize) * sizeof(DdCache);
 #else
     mem = (DdNodePtr *) unique->acache;
-//    offset = (ptruint) mem & (sizeof(DdCache) - 1);
-//    mem += (sizeof(DdCache) - offset) / sizeof(DdNodePtr);
-    offset = (ptruint) mem & (32 - 1);
-    mem += (32 - offset) / sizeof(DdNodePtr);
+    offset = (ptruint) mem & (sizeof(DdCache) - 1);
+    mem += (sizeof(DdCache) - offset) / sizeof(DdNodePtr);
     unique->cache = (DdCache *) mem;
-//    assert(((ptruint) unique->cache & (sizeof(DdCache) - 1)) == 0);
-    assert(((ptruint) unique->cache & (32 - 1)) == 0);
+    assert(((ptruint) unique->cache & (sizeof(DdCache) - 1)) == 0);
     unique->memused += (cacheSize+1) * sizeof(DdCache);
 #endif
     unique->cacheSlots = cacheSize;
@@ -177,8 +146,8 @@ cuddInitCache(
     unique->maxCacheHard = maxCacheSize;
     /* If cacheSlack is non-negative, we can resize. */
     unique->cacheSlack = (int) ddMin(maxCacheSize,
-        DD_MAX_CACHE_TO_SLOTS_RATIO*unique->slots) -
-        2 * (int) cacheSize;
+	DD_MAX_CACHE_TO_SLOTS_RATIO*unique->slots) -
+	2 * (int) cacheSize;
     Cudd_SetMinHit(unique,DD_MIN_HIT);
     /* Initialize to avoid division by 0 and immediate resizing. */
     unique->cacheMisses = (double) (int) (cacheSize * unique->minHit + 1);
@@ -195,10 +164,10 @@ cuddInitCache(
 
     /* Initialize the cache */
     for (i = 0; (unsigned) i < cacheSize; i++) {
-        unique->cache[i].h = 0; /* unused slots */
-        unique->cache[i].data = NULL; /* invalid entry */
+	unique->cache[i].h = 0; /* unused slots */
+	unique->cache[i].data = NULL; /* invalid entry */
 #ifdef DD_CACHE_PROFILE
-        unique->cache[i].count = 0;
+	unique->cache[i].count = 0;
 #endif
     }
 
@@ -207,17 +176,18 @@ cuddInitCache(
 } /* end of cuddInitCache */
 
 
-/**Function********************************************************************
+/**
+  @brief Inserts a result in the cache for a function with three
+  operands.
 
-  Synopsis    [Inserts a result in the cache.]
+  @details The operator tag (see cuddInt.h for details) is split and
+  stored into unused bits of the first two pointers.
 
-  Description []
+  @sideeffect None
 
-  SideEffects [None]
+  @see cuddCacheInsert2 cuddCacheInsert1
 
-  SeeAlso     [cuddCacheInsert2 cuddCacheInsert1]
-
-******************************************************************************/
+*/
 void
 cuddCacheInsert(
   DdManager * table,
@@ -228,22 +198,14 @@ cuddCacheInsert(
   DdNode * data)
 {
     int posn;
-    unsigned hash;
     DdCache *entry;
     ptruint uf, ug, uh;
-    ptruint ufc, ugc, uhc;
 
     uf = (ptruint) f | (op & 0xe);
     ug = (ptruint) g | (op >> 4);
     uh = (ptruint) h;
 
-    ufc = (ptruint) cuddF2L(f) | (op & 0xe);
-    ugc = (ptruint) cuddF2L(g) | (op >> 4);
-    uhc = (ptruint) cuddF2L(h);
-
-    hash = ddCHash2_(uhc,ufc,ugc);
-//    posn = ddCHash2(uhc,ufc,ugc,table->cacheShift);
-    posn = hash >> table->cacheShift;
+    posn = ddCHash2(uh,uf,ug,table->cacheShift);
     entry = &table->cache[posn];
 
     table->cachecollisions += entry->data != NULL;
@@ -256,23 +218,19 @@ cuddCacheInsert(
 #ifdef DD_CACHE_PROFILE
     entry->count++;
 #endif
-    entry->hash = hash;
 
 } /* end of cuddCacheInsert */
 
 
-/**Function********************************************************************
+/**
+  @brief Inserts a result in the cache for a function with two
+  operands.
 
-  Synopsis    [Inserts a result in the cache for a function with two
-  operands.]
+  @sideeffect None
 
-  Description []
+  @see cuddCacheInsert cuddCacheInsert1
 
-  SideEffects [None]
-
-  SeeAlso     [cuddCacheInsert cuddCacheInsert1]
-
-******************************************************************************/
+*/
 void
 cuddCacheInsert2(
   DdManager * table,
@@ -282,16 +240,13 @@ cuddCacheInsert2(
   DdNode * data)
 {
     int posn;
-    unsigned hash;
     DdCache *entry;
 
-    hash = ddCHash2_(op,cuddF2L(f),cuddF2L(g));
-//    posn = ddCHash2(op,cuddF2L(f),cuddF2L(g),table->cacheShift);
-    posn = hash >> table->cacheShift;
+    posn = ddCHash2(op,f,g,table->cacheShift);
     entry = &table->cache[posn];
 
     if (entry->data != NULL) {
-        table->cachecollisions++;
+	table->cachecollisions++;
     }
     table->cacheinserts++;
 
@@ -302,23 +257,19 @@ cuddCacheInsert2(
 #ifdef DD_CACHE_PROFILE
     entry->count++;
 #endif
-    entry->hash = hash;
 
 } /* end of cuddCacheInsert2 */
 
 
-/**Function********************************************************************
+/**
+  @brief Inserts a result in the cache for a function with two
+  operands.
 
-  Synopsis    [Inserts a result in the cache for a function with two
-  operands.]
+  @sideeffect None
 
-  Description []
+  @see cuddCacheInsert cuddCacheInsert2
 
-  SideEffects [None]
-
-  SeeAlso     [cuddCacheInsert cuddCacheInsert2]
-
-******************************************************************************/
+*/
 void
 cuddCacheInsert1(
   DdManager * table,
@@ -327,16 +278,13 @@ cuddCacheInsert1(
   DdNode * data)
 {
     int posn;
-    unsigned hash;
     DdCache *entry;
 
-    hash = ddCHash2_(op,cuddF2L(f),cuddF2L(f));
-//    posn = ddCHash2(op,cuddF2L(f),cuddF2L(f),table->cacheShift);
-    posn = hash >> table->cacheShift;
+    posn = ddCHash2(op,f,f,table->cacheShift);
     entry = &table->cache[posn];
 
     if (entry->data != NULL) {
-        table->cachecollisions++;
+	table->cachecollisions++;
     }
     table->cacheinserts++;
 
@@ -347,24 +295,21 @@ cuddCacheInsert1(
 #ifdef DD_CACHE_PROFILE
     entry->count++;
 #endif
-    entry->hash = hash;
 
 } /* end of cuddCacheInsert1 */
 
 
-/**Function********************************************************************
+/**
+  @brief Looks up in the cache for the result of op applied to f,
+  g, and h.
 
-  Synopsis    [Looks up in the cache for the result of op applied to f,
-  g, and h.]
+  @return the result if found; it returns NULL if no result is found.
 
-  Description [Returns the result if found; it returns NULL if no
-  result is found.]
+  @sideeffect None
 
-  SideEffects [None]
+  @see cuddCacheLookup2 cuddCacheLookup1
 
-  SeeAlso     [cuddCacheLookup2 cuddCacheLookup1]
-
-******************************************************************************/
+*/
 DdNode *
 cuddCacheLookup(
   DdManager * table,
@@ -377,40 +322,36 @@ cuddCacheLookup(
     DdCache *en,*cache;
     DdNode *data;
     ptruint uf, ug, uh;
-    ptruint ufc, ugc, uhc;
 
     uf = (ptruint) f | (op & 0xe);
     ug = (ptruint) g | (op >> 4);
     uh = (ptruint) h;
 
-    ufc = (ptruint) cuddF2L(f) | (op & 0xe);
-    ugc = (ptruint) cuddF2L(g) | (op >> 4);
-    uhc = (ptruint) cuddF2L(h);
-
     cache = table->cache;
 #ifdef DD_DEBUG
     if (cache == NULL) {
-        return(NULL);
+	return(NULL);
     }
 #endif
 
-    posn = ddCHash2(uhc,ufc,ugc,table->cacheShift);
+    posn = ddCHash2(uh,uf,ug,table->cacheShift);
     en = &cache[posn];
-    if (en->data != NULL && en->f==(DdNodePtr)uf && en->g==(DdNodePtr)ug && en->h==uh) {
-        data = Cudd_Regular(en->data);
-        table->cacheHits++;
-        if (data->ref == 0) {
-            cuddReclaim(table,data);
-        }
-        return(en->data);
+    if (en->data != NULL && en->f==(DdNodePtr)uf && en->g==(DdNodePtr)ug &&
+	en->h==uh) {
+	data = Cudd_Regular(en->data);
+	table->cacheHits++;
+	if (data->ref == 0) {
+	    cuddReclaim(table,data);
+	}
+	return(en->data);
     }
 
     /* Cache miss: decide whether to resize. */
     table->cacheMisses++;
 
     if (table->cacheSlack >= 0 &&
-        table->cacheHits > table->cacheMisses * table->minHit) {
-        cuddCacheResize(table);
+	table->cacheHits > table->cacheMisses * table->minHit) {
+	cuddCacheResize(table);
     }
 
     return(NULL);
@@ -418,19 +359,17 @@ cuddCacheLookup(
 } /* end of cuddCacheLookup */
 
 
-/**Function********************************************************************
+/**
+  @brief Looks up in the cache for the result of op applied to f,
+  g, and h.
 
-  Synopsis    [Looks up in the cache for the result of op applied to f,
-  g, and h.]
+  @return the result if found; it returns NULL if no result is found.
 
-  Description [Returns the result if found; it returns NULL if no
-  result is found.]
+  @sideeffect None
 
-  SideEffects [None]
+  @see cuddCacheLookup2Zdd cuddCacheLookup1Zdd
 
-  SeeAlso     [cuddCacheLookup2Zdd cuddCacheLookup1Zdd]
-
-******************************************************************************/
+*/
 DdNode *
 cuddCacheLookupZdd(
   DdManager * table,
@@ -443,41 +382,36 @@ cuddCacheLookupZdd(
     DdCache *en,*cache;
     DdNode *data;
     ptruint uf, ug, uh;
-    ptruint ufc, ugc, uhc;
 
     uf = (ptruint) f | (op & 0xe);
     ug = (ptruint) g | (op >> 4);
     uh = (ptruint) h;
 
-    ufc = (ptruint) cuddF2L(f) | (op & 0xe);
-    ugc = (ptruint) cuddF2L(g) | (op >> 4);
-    uhc = (ptruint) cuddF2L(h);
-
     cache = table->cache;
 #ifdef DD_DEBUG
     if (cache == NULL) {
-        return(NULL);
+	return(NULL);
     }
 #endif
 
-    posn = ddCHash2(uhc,ufc,ugc,table->cacheShift);
+    posn = ddCHash2(uh,uf,ug,table->cacheShift);
     en = &cache[posn];
     if (en->data != NULL && en->f==(DdNodePtr)uf && en->g==(DdNodePtr)ug &&
-        en->h==uh) {
-        data = Cudd_Regular(en->data);
-        table->cacheHits++;
-        if (data->ref == 0) {
-            cuddReclaimZdd(table,data);
-        }
-        return(en->data);
+	en->h==uh) {
+	data = Cudd_Regular(en->data);
+	table->cacheHits++;
+	if (data->ref == 0) {
+	    cuddReclaimZdd(table,data);
+	}
+	return(en->data);
     }
 
     /* Cache miss: decide whether to resize. */
     table->cacheMisses++;
 
     if (table->cacheSlack >= 0 &&
-        table->cacheHits > table->cacheMisses * table->minHit) {
-        cuddCacheResize(table);
+	table->cacheHits > table->cacheMisses * table->minHit) {
+	cuddCacheResize(table);
     }
 
     return(NULL);
@@ -485,19 +419,17 @@ cuddCacheLookupZdd(
 } /* end of cuddCacheLookupZdd */
 
 
-/**Function********************************************************************
+/**
+  @brief Looks up in the cache for the result of op applied to f
+  and g.
 
-  Synopsis    [Looks up in the cache for the result of op applied to f
-  and g.]
+  @return the result if found; it returns NULL if no result is found.
 
-  Description [Returns the result if found; it returns NULL if no
-  result is found.]
+  @sideeffect None
 
-  SideEffects [None]
+  @see cuddCacheLookup cuddCacheLookup1
 
-  SeeAlso     [cuddCacheLookup cuddCacheLookup1]
-
-******************************************************************************/
+*/
 DdNode *
 cuddCacheLookup2(
   DdManager * table,
@@ -512,27 +444,27 @@ cuddCacheLookup2(
     cache = table->cache;
 #ifdef DD_DEBUG
     if (cache == NULL) {
-        return(NULL);
+	return(NULL);
     }
 #endif
 
-    posn = ddCHash2(op,cuddF2L(f),cuddF2L(g),table->cacheShift);
+    posn = ddCHash2(op,f,g,table->cacheShift);
     en = &cache[posn];
     if (en->data != NULL && en->f==f && en->g==g && en->h==(ptruint)op) {
-        data = Cudd_Regular(en->data);
-        table->cacheHits++;
-        if (data->ref == 0) {
-            cuddReclaim(table,data);
-        }
-        return(en->data);
+	data = Cudd_Regular(en->data);
+	table->cacheHits++;
+	if (data->ref == 0) {
+	    cuddReclaim(table,data);
+	}
+	return(en->data);
     }
 
     /* Cache miss: decide whether to resize. */
     table->cacheMisses++;
 
     if (table->cacheSlack >= 0 &&
-        table->cacheHits > table->cacheMisses * table->minHit) {
-        cuddCacheResize(table);
+	table->cacheHits > table->cacheMisses * table->minHit) {
+	cuddCacheResize(table);
     }
 
     return(NULL);
@@ -540,18 +472,16 @@ cuddCacheLookup2(
 } /* end of cuddCacheLookup2 */
 
 
-/**Function********************************************************************
+/**
+  @brief Looks up in the cache for the result of op applied to f.
 
-  Synopsis [Looks up in the cache for the result of op applied to f.]
+  @return the result if found; it returns NULL if no result is found.
 
-  Description [Returns the result if found; it returns NULL if no
-  result is found.]
+  @sideeffect None
 
-  SideEffects [None]
+  @see cuddCacheLookup cuddCacheLookup2
 
-  SeeAlso     [cuddCacheLookup cuddCacheLookup2]
-
-******************************************************************************/
+*/
 DdNode *
 cuddCacheLookup1(
   DdManager * table,
@@ -565,27 +495,27 @@ cuddCacheLookup1(
     cache = table->cache;
 #ifdef DD_DEBUG
     if (cache == NULL) {
-        return(NULL);
+	return(NULL);
     }
 #endif
 
-    posn = ddCHash2(op,cuddF2L(f),cuddF2L(f),table->cacheShift);
+    posn = ddCHash2(op,f,f,table->cacheShift);
     en = &cache[posn];
     if (en->data != NULL && en->f==f && en->h==(ptruint)op) {
-        data = Cudd_Regular(en->data);
-        table->cacheHits++;
-        if (data->ref == 0) {
-            cuddReclaim(table,data);
-        }
-        return(en->data);
+	data = Cudd_Regular(en->data);
+	table->cacheHits++;
+	if (data->ref == 0) {
+	    cuddReclaim(table,data);
+	}
+	return(en->data);
     }
 
     /* Cache miss: decide whether to resize. */
     table->cacheMisses++;
 
     if (table->cacheSlack >= 0 &&
-        table->cacheHits > table->cacheMisses * table->minHit) {
-        cuddCacheResize(table);
+	table->cacheHits > table->cacheMisses * table->minHit) {
+	cuddCacheResize(table);
     }
 
     return(NULL);
@@ -593,19 +523,17 @@ cuddCacheLookup1(
 } /* end of cuddCacheLookup1 */
 
 
-/**Function********************************************************************
+/**
+  @brief Looks up in the cache for the result of op applied to f
+  and g.
 
-  Synopsis [Looks up in the cache for the result of op applied to f
-  and g.]
+  @return the result if found; it returns NULL if no result is found.
 
-  Description [Returns the result if found; it returns NULL if no
-  result is found.]
+  @sideeffect None
 
-  SideEffects [None]
+  @see cuddCacheLookupZdd cuddCacheLookup1Zdd
 
-  SeeAlso     [cuddCacheLookupZdd cuddCacheLookup1Zdd]
-
-******************************************************************************/
+*/
 DdNode *
 cuddCacheLookup2Zdd(
   DdManager * table,
@@ -620,27 +548,27 @@ cuddCacheLookup2Zdd(
     cache = table->cache;
 #ifdef DD_DEBUG
     if (cache == NULL) {
-        return(NULL);
+	return(NULL);
     }
 #endif
 
-    posn = ddCHash2(op,cuddF2L(f),cuddF2L(g),table->cacheShift);
+    posn = ddCHash2(op,f,g,table->cacheShift);
     en = &cache[posn];
     if (en->data != NULL && en->f==f && en->g==g && en->h==(ptruint)op) {
-        data = Cudd_Regular(en->data);
-        table->cacheHits++;
-        if (data->ref == 0) {
-            cuddReclaimZdd(table,data);
-        }
-        return(en->data);
+	data = Cudd_Regular(en->data);
+	table->cacheHits++;
+	if (data->ref == 0) {
+	    cuddReclaimZdd(table,data);
+	}
+	return(en->data);
     }
 
     /* Cache miss: decide whether to resize. */
     table->cacheMisses++;
 
     if (table->cacheSlack >= 0 &&
-        table->cacheHits > table->cacheMisses * table->minHit) {
-        cuddCacheResize(table);
+	table->cacheHits > table->cacheMisses * table->minHit) {
+	cuddCacheResize(table);
     }
 
     return(NULL);
@@ -648,18 +576,16 @@ cuddCacheLookup2Zdd(
 } /* end of cuddCacheLookup2Zdd */
 
 
-/**Function********************************************************************
+/**
+  @brief Looks up in the cache for the result of op applied to f.
 
-  Synopsis [Looks up in the cache for the result of op applied to f.]
+  @return the result if found; it returns NULL if no result is found.
 
-  Description [Returns the result if found; it returns NULL if no
-  result is found.]
+  @sideeffect None
 
-  SideEffects [None]
+  @see cuddCacheLookupZdd cuddCacheLookup2Zdd
 
-  SeeAlso     [cuddCacheLookupZdd cuddCacheLookup2Zdd]
-
-******************************************************************************/
+*/
 DdNode *
 cuddCacheLookup1Zdd(
   DdManager * table,
@@ -673,27 +599,27 @@ cuddCacheLookup1Zdd(
     cache = table->cache;
 #ifdef DD_DEBUG
     if (cache == NULL) {
-        return(NULL);
+	return(NULL);
     }
 #endif
 
-    posn = ddCHash2(op,cuddF2L(f),cuddF2L(f),table->cacheShift);
+    posn = ddCHash2(op,f,f,table->cacheShift);
     en = &cache[posn];
     if (en->data != NULL && en->f==f && en->h==(ptruint)op) {
-        data = Cudd_Regular(en->data);
-        table->cacheHits++;
-        if (data->ref == 0) {
-            cuddReclaimZdd(table,data);
-        }
-        return(en->data);
+	data = Cudd_Regular(en->data);
+	table->cacheHits++;
+	if (data->ref == 0) {
+	    cuddReclaimZdd(table,data);
+	}
+	return(en->data);
     }
 
     /* Cache miss: decide whether to resize. */
     table->cacheMisses++;
 
     if (table->cacheSlack >= 0  &&
-        table->cacheHits > table->cacheMisses * table->minHit) {
-        cuddCacheResize(table);
+	table->cacheHits > table->cacheMisses * table->minHit) {
+	cuddCacheResize(table);
     }
 
     return(NULL);
@@ -701,22 +627,22 @@ cuddCacheLookup1Zdd(
 } /* end of cuddCacheLookup1Zdd */
 
 
-/**Function********************************************************************
+/**
+  @brief Looks up in the cache for the result of op applied to f,
+  g, and h.
 
-  Synopsis [Looks up in the cache for the result of op applied to f,
-  g, and h.]
-
-  Description [Looks up in the cache for the result of op applied to f,
-  g, and h. Assumes that the calling procedure (e.g.,
+  @details Assumes that the calling procedure (e.g.,
   Cudd_bddIteConstant) is only interested in whether the result is
-  constant or not. Returns the result if found (possibly
-  DD_NON_CONSTANT); otherwise it returns NULL.]
+  constant or not.
 
-  SideEffects [None]
+  @return the result if found (possibly DD_NON_CONSTANT); otherwise it
+  returns NULL.
 
-  SeeAlso     [cuddCacheLookup]
+  @sideeffect None
 
-******************************************************************************/
+  @see cuddCacheLookup
+
+*/
 DdNode *
 cuddConstantLookup(
   DdManager * table,
@@ -728,40 +654,35 @@ cuddConstantLookup(
     int posn;
     DdCache *en,*cache;
     ptruint uf, ug, uh;
-    ptruint ufc, ugc, uhc;
 
     uf = (ptruint) f | (op & 0xe);
     ug = (ptruint) g | (op >> 4);
     uh = (ptruint) h;
 
-    ufc = (ptruint) cuddF2L(f) | (op & 0xe);
-    ugc = (ptruint) cuddF2L(g) | (op >> 4);
-    uhc = (ptruint) cuddF2L(h);
-
     cache = table->cache;
 #ifdef DD_DEBUG
     if (cache == NULL) {
-        return(NULL);
+	return(NULL);
     }
 #endif
-    posn = ddCHash2(uhc,ufc,ugc,table->cacheShift);
+    posn = ddCHash2(uh,uf,ug,table->cacheShift);
     en = &cache[posn];
 
     /* We do not reclaim here because the result should not be
      * referenced, but only tested for being a constant.
      */
     if (en->data != NULL &&
-        en->f == (DdNodePtr)uf && en->g == (DdNodePtr)ug && en->h == uh) {
-        table->cacheHits++;
-        return(en->data);
+	en->f == (DdNodePtr)uf && en->g == (DdNodePtr)ug && en->h == uh) {
+	table->cacheHits++;
+	return(en->data);
     }
 
     /* Cache miss: decide whether to resize. */
     table->cacheMisses++;
 
     if (table->cacheSlack >= 0 &&
-        table->cacheHits > table->cacheMisses * table->minHit) {
-        cuddCacheResize(table);
+	table->cacheHits > table->cacheMisses * table->minHit) {
+	cuddCacheResize(table);
     }
 
     return(NULL);
@@ -769,18 +690,14 @@ cuddConstantLookup(
 } /* end of cuddConstantLookup */
 
 
-/**Function********************************************************************
+/**
+  @brief Computes and prints a profile of the cache usage.
 
-  Synopsis    [Computes and prints a profile of the cache usage.]
+  @return 1 if successful; 0 otherwise.
 
-  Description [Computes and prints a profile of the cache usage.
-  Returns 1 if successful; 0 otherwise.]
+  @sideeffect None
 
-  SideEffects [None]
-
-  SeeAlso     []
-
-******************************************************************************/
+*/
 int
 cuddCacheProfile(
   DdManager * table,
@@ -807,44 +724,44 @@ cuddCacheProfile(
     imax = imin = 0;
     totalcount = 0.0;
 
-    hystogramQ = ABC_ALLOC(double, nbins);
+    hystogramQ = ALLOC(double, nbins);
     if (hystogramQ == NULL) {
-        table->errorCode = CUDD_MEMORY_OUT;
-        return(0);
+	table->errorCode = CUDD_MEMORY_OUT;
+	return(0);
     }
-    hystogramR = ABC_ALLOC(double, nbins);
+    hystogramR = ALLOC(double, nbins);
     if (hystogramR == NULL) {
-        ABC_FREE(hystogramQ);
-        table->errorCode = CUDD_MEMORY_OUT;
-        return(0);
+	FREE(hystogramQ);
+	table->errorCode = CUDD_MEMORY_OUT;
+	return(0);
     }
     for (i = 0; i < nbins; i++) {
-        hystogramQ[i] = 0;
-        hystogramR[i] = 0;
+	hystogramQ[i] = 0;
+	hystogramR[i] = 0;
     }
 
     for (i = 0; i < slots; i++) {
-        thiscount = (long) cache[i].count;
-        if (thiscount > max) {
-            max = thiscount;
-            imax = i;
-        }
-        if (thiscount < min) {
-            min = thiscount;
-            imin = i;
-        }
-        if (thiscount == 0) {
-            nzeroes++;
-        }
-        count = (double) thiscount;
-        mean += count;
-        meansq += count * count;
-        totalcount += count;
-        expected += count * (double) i;
-        bin = (i * nbins) / slots;
-        hystogramQ[bin] += (double) thiscount;
-        bin = i % nbins;
-        hystogramR[bin] += (double) thiscount;
+	thiscount = (long) cache[i].count;
+	if (thiscount > max) {
+	    max = thiscount;
+	    imax = i;
+	}
+	if (thiscount < min) {
+	    min = thiscount;
+	    imin = i;
+	}
+	if (thiscount == 0) {
+	    nzeroes++;
+	}
+	count = (double) thiscount;
+	mean += count;
+	meansq += count * count;
+	totalcount += count;
+	expected += count * (double) i;
+	bin = (i * nbins) / slots;
+	hystogramQ[bin] += (double) thiscount;
+	bin = i % nbins;
+	hystogramR[bin] += (double) thiscount;
     }
     mean /= (double) slots;
     meansq /= (double) slots;
@@ -866,43 +783,43 @@ cuddCacheProfile(
     if (retval == EOF) return(0);
     exUsed = 100.0 * (1.0 - exp(-totalcount / (double) slots));
     retval = fprintf(fp,"Cache used slots = %.2f%% (expected %.2f%%)\n",
-                     100.0 - (double) nzeroes * 100.0 / (double) slots,
-                     exUsed);
+		     100.0 - (double) nzeroes * 100.0 / (double) slots,
+		     exUsed);
     if (retval == EOF) return(0);
 
     if (totalcount > 0) {
-        expected /= totalcount;
-        retval = fprintf(fp,"Cache access hystogram for %d bins", nbins);
-        if (retval == EOF) return(0);
-        retval = fprintf(fp," (expected bin value = %g)\nBy quotient:",
-                         expected);
-        if (retval == EOF) return(0);
-        for (i = nbins - 1; i>=0; i--) {
-            retval = fprintf(fp," %.0f", hystogramQ[i]);
-            if (retval == EOF) return(0);
-        }
-        retval = fprintf(fp,"\nBy residue: ");
-        if (retval == EOF) return(0);
-        for (i = nbins - 1; i>=0; i--) {
-            retval = fprintf(fp," %.0f", hystogramR[i]);
-            if (retval == EOF) return(0);
-        }
-        retval = fprintf(fp,"\n");
-        if (retval == EOF) return(0);
+	expected /= totalcount;
+	retval = fprintf(fp,"Cache access hystogram for %d bins", nbins);
+	if (retval == EOF) return(0);
+	retval = fprintf(fp," (expected bin value = %g)\nBy quotient:",
+			 expected);
+	if (retval == EOF) return(0);
+	for (i = nbins - 1; i>=0; i--) {
+	    retval = fprintf(fp," %.0f", hystogramQ[i]);
+	    if (retval == EOF) return(0);
+	}
+	retval = fprintf(fp,"\nBy residue: ");
+	if (retval == EOF) return(0);
+	for (i = nbins - 1; i>=0; i--) {
+	    retval = fprintf(fp," %.0f", hystogramR[i]);
+	    if (retval == EOF) return(0);
+	}
+	retval = fprintf(fp,"\n");
+	if (retval == EOF) return(0);
     }
 
-    ABC_FREE(hystogramQ);
-    ABC_FREE(hystogramR);
+    FREE(hystogramQ);
+    FREE(hystogramR);
 #else
     for (i = 0; i < slots; i++) {
-        nzeroes += cache[i].h == 0;
+	nzeroes += cache[i].h == 0;
     }
     exUsed = 100.0 *
-        (1.0 - exp(-(table->cacheinserts - table->cacheLastInserts) /
-                   (double) slots));
+	(1.0 - exp(-(table->cacheinserts - table->cacheLastInserts) /
+		   (double) slots));
     retval = fprintf(fp,"Cache used slots = %.2f%% (expected %.2f%%)\n",
-                     100.0 - (double) nzeroes * 100.0 / (double) slots,
-                     exUsed);
+		     100.0 - (double) nzeroes * 100.0 / (double) slots,
+		     exUsed);
     if (retval == EOF) return(0);
 #endif
     return(1);
@@ -910,17 +827,12 @@ cuddCacheProfile(
 } /* end of cuddCacheProfile */
 
 
-/**Function********************************************************************
+/**
+  @brief Resizes the cache.
 
-  Synopsis    [Resizes the cache.]
+  @sideeffect None
 
-  Description []
-
-  SideEffects [None]
-
-  SeeAlso     []
-
-******************************************************************************/
+*/
 void
 cuddCacheResize(
   DdManager * table)
@@ -945,29 +857,28 @@ cuddCacheResize(
 
 #ifdef DD_VERBOSE
     (void) fprintf(table->err,"Resizing the cache from %d to %d entries\n",
-                   oldslots, slots);
+		   oldslots, slots);
     (void) fprintf(table->err,
-                   "\thits = %g\tmisses = %g\thit ratio = %5.3f\n",
-                   table->cacheHits, table->cacheMisses,
-                   table->cacheHits / (table->cacheHits + table->cacheMisses));
+		   "\thits = %g\tmisses = %g\thit ratio = %5.3f\n",
+		   table->cacheHits, table->cacheMisses,
+		   table->cacheHits / (table->cacheHits + table->cacheMisses));
 #endif
 
     saveHandler = MMoutOfMemory;
-    MMoutOfMemory = Cudd_OutOfMem;
-//    table->acache = cache = ABC_ALLOC(DdCache,slots+1);
-    table->acache = cache = ABC_ALLOC(DdCache,slots+2);
+    MMoutOfMemory = table->outOfMemCallback;
+    table->acache = cache = ALLOC(DdCache,slots+1);
     MMoutOfMemory = saveHandler;
     /* If we fail to allocate the new table we just give up. */
     if (cache == NULL) {
 #ifdef DD_VERBOSE
-        (void) fprintf(table->err,"Resizing failed. Giving up.\n");
+	(void) fprintf(table->err,"Resizing failed. Giving up.\n");
 #endif
-        table->cacheSlots = oldslots;
-        table->acache = oldacache;
-        /* Do not try to resize again. */
-        table->maxCacheHard = oldslots - 1;
-        table->cacheSlack = - (int) (oldslots + 1);
-        return;
+	table->cacheSlots = oldslots;
+	table->acache = oldacache;
+	/* Do not try to resize again. */
+	table->maxCacheHard = oldslots - 1;
+	table->cacheSlack = - (int) (oldslots + 1);
+	return;
     }
     /* If the size of the cache entry is a power of 2, we want to
     ** enforce alignment to that power of two. This happens when
@@ -976,14 +887,10 @@ cuddCacheResize(
     table->cache = cache;
 #else
     mem = (DdNodePtr *) cache;
-//    misalignment = (ptruint) mem & (sizeof(DdCache) - 1);
-//    mem += (sizeof(DdCache) - misalignment) / sizeof(DdNodePtr);
-//    table->cache = cache = (DdCache *) mem;
-//    assert(((ptruint) table->cache & (sizeof(DdCache) - 1)) == 0);
-    misalignment = (ptruint) mem & (32 - 1);
-    mem += (32 - misalignment) / sizeof(DdNodePtr);
+    misalignment = (ptruint) mem & (sizeof(DdCache) - 1);
+    mem += (sizeof(DdCache) - misalignment) / sizeof(DdNodePtr);
     table->cache = cache = (DdCache *) mem;
-    assert(((ptruint) table->cache & (32 - 1)) == 0);
+    assert(((ptruint) table->cache & (sizeof(DdCache) - 1)) == 0);
 #endif
     shift = --(table->cacheShift);
     table->memused += (slots - oldslots) * sizeof(DdCache);
@@ -991,33 +898,31 @@ cuddCacheResize(
 
     /* Clear new cache. */
     for (i = 0; (unsigned) i < slots; i++) {
-        cache[i].data = NULL;
-        cache[i].h = 0;
+	cache[i].data = NULL;
+	cache[i].h = 0;
 #ifdef DD_CACHE_PROFILE
-        cache[i].count = 0;
+	cache[i].count = 0;
 #endif
     }
 
     /* Copy from old cache to new one. */
     for (i = 0; (unsigned) i < oldslots; i++) {
-        old = &oldcache[i];
-        if (old->data != NULL) {
-//            posn = ddCHash2(old->h,old->f,old->g,shift);
-            posn = old->hash >> shift;
-            entry = &cache[posn];
-            entry->f = old->f;
-            entry->g = old->g;
-            entry->h = old->h;
-            entry->data = old->data;
+	old = &oldcache[i];
+	if (old->data != NULL) {
+	    posn = ddCHash2(old->h,old->f,old->g,shift);
+	    entry = &cache[posn];
+	    entry->f = old->f;
+	    entry->g = old->g;
+	    entry->h = old->h;
+	    entry->data = old->data;
 #ifdef DD_CACHE_PROFILE
-            entry->count = 1;
+	    entry->count = 1;
 #endif
-            entry->hash = old->hash;
-            moved++;
-        }
+	    moved++;
+	}
     }
 
-    ABC_FREE(oldacache);
+    FREE(oldacache);
 
     /* Reinitialize measurements so as to avoid division by 0 and
     ** immediate resizing.
@@ -1032,17 +937,12 @@ cuddCacheResize(
 } /* end of cuddCacheResize */
 
 
-/**Function********************************************************************
+/**
+  @brief Flushes the cache.
 
-  Synopsis    [Flushes the cache.]
+  @sideeffect None
 
-  Description []
-
-  SideEffects [None]
-
-  SeeAlso     []
-
-******************************************************************************/
+*/
 void
 cuddCacheFlush(
   DdManager * table)
@@ -1053,8 +953,8 @@ cuddCacheFlush(
     slots = table->cacheSlots;
     cache = table->cache;
     for (i = 0; i < slots; i++) {
-        table->cachedeletions += cache[i].data != NULL;
-        cache[i].data = NULL;
+	table->cachedeletions += cache[i].data != NULL;
+	cache[i].data = NULL;
     }
     table->cacheLastInserts = table->cacheinserts;
 
@@ -1063,18 +963,14 @@ cuddCacheFlush(
 } /* end of cuddCacheFlush */
 
 
-/**Function********************************************************************
+/**
+  @brief Returns the floor of the logarithm to the base 2.
 
-  Synopsis    [Returns the floor of the logarithm to the base 2.]
+  @details The input value is assumed to be greater than 0.
 
-  Description [Returns the floor of the logarithm to the base 2.
-  The input value is assumed to be greater than 0.]
+  @sideeffect None
 
-  SideEffects [None]
-
-  SeeAlso     []
-
-******************************************************************************/
+*/
 int
 cuddComputeFloorLog2(
   unsigned int value)
@@ -1084,8 +980,8 @@ cuddComputeFloorLog2(
     assert(value > 0);
 #endif
     while (value > 1) {
-        floorLog++;
-        value >>= 1;
+	floorLog++;
+	value >>= 1;
     }
     return(floorLog);
 
@@ -1095,6 +991,4 @@ cuddComputeFloorLog2(
 /* Definition of static functions                                            */
 /*---------------------------------------------------------------------------*/
 
-
 ABC_NAMESPACE_IMPL_END
-

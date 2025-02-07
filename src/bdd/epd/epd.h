@@ -51,6 +51,9 @@
 #ifndef ABC__bdd__epd__epd_h
 #define ABC__bdd__epd__epd_h
 
+#include "misc/util/util_hack.h"
+
+
 ABC_NAMESPACE_HEADER_START
 
 /*---------------------------------------------------------------------------*/

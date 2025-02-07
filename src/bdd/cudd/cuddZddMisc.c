@@ -1,31 +1,14 @@
-/**CFile***********************************************************************
+/**
+  @file
 
-  FileName    [cuddZddMisc.c]
+  @ingroup cudd
 
-  PackageName [cudd]
+  @brief Miscellaneous utility functions for ZDDs.
 
-  Synopsis    [Miscellaneous utility functions for ZDDs.]
+  @author Hyong-Kyoon Shin, In-Ho Moon
 
-  Description [External procedures included in this module:
-                    <ul>
-                    <li> Cudd_zddDagSize()
-                    <li> Cudd_zddCountMinterm()
-                    <li> Cudd_zddPrintSubtable()
-                    </ul>
-               Internal procedures included in this module:
-                    <ul>
-                    </ul>
-               Static procedures included in this module:
-                    <ul>
-                    <li> cuddZddDagInt()
-                    </ul>
-              ]
-
-  SeeAlso     []
-
-  Author      [Hyong-Kyoon Shin, In-Ho Moon]
-
-  Copyright   [Copyright (c) 1995-2004, Regents of the University of Colorado
+  @copyright@parblock
+  Copyright (c) 1995-2015, Regents of the University of Colorado
 
   All rights reserved.
 
@@ -55,17 +38,16 @@
   CAUSED AND ON ANY THEORY OF LIABILITY, WHETHER IN CONTRACT, STRICT
   LIABILITY, OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN
   ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE
-  POSSIBILITY OF SUCH DAMAGE.]
+  POSSIBILITY OF SUCH DAMAGE.
+  @endparblock
 
-******************************************************************************/
+*/
 
 #include <math.h>
 #include "misc/util/util_hack.h"
 #include "cuddInt.h"
 
 ABC_NAMESPACE_IMPL_START
-
-
 
 /*---------------------------------------------------------------------------*/
 /* Constant declarations                                                     */
@@ -86,16 +68,12 @@ ABC_NAMESPACE_IMPL_START
 /* Variable declarations                                                     */
 /*---------------------------------------------------------------------------*/
 
-#ifndef lint
-static char rcsid[] DD_UNUSED = "$Id: cuddZddMisc.c,v 1.16 2009/02/20 02:14:58 fabio Exp $";
-#endif
 
 /*---------------------------------------------------------------------------*/
 /* Macro declarations                                                        */
 /*---------------------------------------------------------------------------*/
 
-
-/**AutomaticStart*************************************************************/
+/** \cond */
 
 /*---------------------------------------------------------------------------*/
 /* Static function prototypes                                                */
@@ -103,7 +81,7 @@ static char rcsid[] DD_UNUSED = "$Id: cuddZddMisc.c,v 1.16 2009/02/20 02:14:58 f
 
 static int cuddZddDagInt (DdNode *n, st__table *tab);
 
-/**AutomaticEnd***************************************************************/
+/** \endcond */
 
 
 /*---------------------------------------------------------------------------*/
@@ -111,27 +89,26 @@ static int cuddZddDagInt (DdNode *n, st__table *tab);
 /*---------------------------------------------------------------------------*/
 
 
-/**Function********************************************************************
+/**
+  @brief Counts the number of nodes in a %ZDD.
 
-  Synopsis    [Counts the number of nodes in a ZDD.]
+  @deprecated This function duplicates Cudd_DagSize and is only
+  retained for compatibility.
 
-  Description [Counts the number of nodes in a ZDD. This function
-  duplicates Cudd_DagSize and is only retained for compatibility.]
+  @sideeffect None
 
-  SideEffects [None]
+  @see Cudd_DagSize
 
-  SeeAlso     [Cudd_DagSize]
-
-******************************************************************************/
+*/
 int
 Cudd_zddDagSize(
   DdNode * p_node)
 {
 
-    int         i;
-    st__table    *table;
+    int		i;
+    st__table	*table;
 
-    table = st__init_table( st__ptrcmp, st__ptrhash);
+    table = st__init_table(st__ptrcmp, st__ptrhash);
     i = cuddZddDagInt(p_node, table);
     st__free_table(table);
     return(i);
@@ -139,28 +116,29 @@ Cudd_zddDagSize(
 } /* end of Cudd_zddDagSize */
 
 
-/**Function********************************************************************
+/**
+  @brief Counts the number of minterms of a %ZDD.
 
-  Synopsis    [Counts the number of minterms of a ZDD.]
-
-  Description [Counts the number of minterms of the ZDD rooted at
-  <code>node</code>. This procedure takes a parameter
+  @details Counts the number of minterms of the %ZDD rooted at
+  <code>node</code>.  This procedure takes a parameter
   <code>path</code> that specifies how many variables are in the
-  support of the function. If the procedure runs out of memory, it
-  returns (double) CUDD_OUT_OF_MEM.]
+  support of the function.
 
-  SideEffects [None]
+  @return the count.  If the procedure runs out of memory, it returns
+  (double) CUDD_OUT_OF_MEM.
 
-  SeeAlso     [Cudd_zddCountDouble]
+  @sideeffect None
 
-******************************************************************************/
+  @see Cudd_zddCountDouble
+
+*/
 double
 Cudd_zddCountMinterm(
   DdManager * zdd,
   DdNode * node,
   int  path)
 {
-    double      dc_var, minterms;
+    double	dc_var, minterms;
 
     dc_var = (double)((double)(zdd->sizeZ) - (double)path);
     minterms = Cudd_zddCountDouble(zdd, node) / pow(2.0, dc_var);
@@ -169,75 +147,54 @@ Cudd_zddCountMinterm(
 } /* end of Cudd_zddCountMinterm */
 
 
-/**Function********************************************************************
+/**
+  @brief Prints the %ZDD table for debugging purposes.
 
-  Synopsis    [Prints the ZDD table.]
+  @sideeffect None
 
-  Description [Prints the ZDD table for debugging purposes.]
-
-  SideEffects [None]
-
-  SeeAlso     []
-
-******************************************************************************/
+*/
 void
 Cudd_zddPrintSubtable(
   DdManager * table)
 {
-    int         i, j;
-    DdNode      *z1, *z1_next, *base;
-    DdSubtable  *ZSubTable;
+    int		i, j;
+    DdNode	*z1, *z1_next, *base;
+    DdSubtable	*ZSubTable;
 
     base = table->one;
     for (i = table->sizeZ - 1; i >= 0; i--) {
-        ZSubTable = &(table->subtableZ[i]);
-        printf("subtable[%d]:\n", i);
-        for (j = ZSubTable->slots - 1; j >= 0; j--) {
-            z1 = ZSubTable->nodelist[j];
-            while (z1 != NIL(DdNode)) {
-                (void) fprintf(table->out,
-#if SIZEOF_VOID_P == 8
-                    "ID = 0x%lx\tindex = %u\tr = %u\t",
-                    (ptruint) z1 / (ptruint) sizeof(DdNode),
-                    z1->index, z1->ref);
-#else
-                    "ID = 0x%x\tindex = %hu\tr = %hu\t",
-                    (ptruint) z1 / (ptruint) sizeof(DdNode),
-                    z1->index, z1->ref);
-#endif
-                z1_next = cuddT(z1);
-                if (Cudd_IsConstant(z1_next)) {
-                    (void) fprintf(table->out, "T = %d\t\t",
-                        (z1_next == base));
-                }
-                else {
-#if SIZEOF_VOID_P == 8
-                    (void) fprintf(table->out, "T = 0x%lx\t",
-                        (ptruint) z1_next / (ptruint) sizeof(DdNode));
-#else
-                    (void) fprintf(table->out, "T = 0x%x\t",
-                        (ptruint) z1_next / (ptruint) sizeof(DdNode));
-#endif
-                }
-                z1_next = cuddE(z1);
-                if (Cudd_IsConstant(z1_next)) {
-                    (void) fprintf(table->out, "E = %d\n",
-                        (z1_next == base));
-                }
-                else {
-#if SIZEOF_VOID_P == 8
-                    (void) fprintf(table->out, "E = 0x%lx\n",
-                        (ptruint) z1_next / (ptruint) sizeof(DdNode));
-#else
-                    (void) fprintf(table->out, "E = 0x%x\n",
-                        (ptruint) z1_next / (ptruint) sizeof(DdNode));
-#endif
-                }
+	ZSubTable = &(table->subtableZ[i]);
+	printf("subtable[%d]:\n", i);
+	for (j = ZSubTable->slots - 1; j >= 0; j--) {
+	    z1 = ZSubTable->nodelist[j];
+	    while (z1 != NIL(DdNode)) {
+		(void) fprintf(table->out,
+		    "ID = 0x%" PRIxPTR "\tindex = %u\tr = %u\t",
+		    (ptruint) z1 / (ptruint) sizeof(DdNode),
+		    z1->index, z1->ref);
+		z1_next = cuddT(z1);
+		if (Cudd_IsConstantInt(z1_next)) {
+		    (void) fprintf(table->out, "T = %d\t\t",
+			(z1_next == base));
+		}
+		else {
+		    (void) fprintf(table->out, "T = 0x%" PRIxPTR "\t",
+			(ptruint) z1_next / (ptruint) sizeof(DdNode));
+		}
+		z1_next = cuddE(z1);
+		if (Cudd_IsConstantInt(z1_next)) {
+		    (void) fprintf(table->out, "E = %d\n",
+			(z1_next == base));
+		}
+		else {
+		    (void) fprintf(table->out, "E = 0x%" PRIxPTR "\n",
+			(ptruint) z1_next / (ptruint) sizeof(DdNode));
+		}
 
-                z1_next = z1->next;
-                z1 = z1_next;
-            }
-        }
+		z1_next = z1->next;
+		z1 = z1_next;
+	    }
+	}
     }
     putchar('\n');
 
@@ -249,38 +206,32 @@ Cudd_zddPrintSubtable(
 /*---------------------------------------------------------------------------*/
 
 
-/**Function********************************************************************
+/**
+  @brief Performs the recursive step of Cudd_zddDagSize.
 
-  Synopsis    [Performs the recursive step of Cudd_zddDagSize.]
+  @details Does not check for out-of-memory conditions.
 
-  Description [Performs the recursive step of Cudd_zddDagSize. Does
-  not check for out-of-memory conditions.]
+  @sideeffect None
 
-  SideEffects [None]
-
-  SeeAlso     []
-
-******************************************************************************/
+*/
 static int
 cuddZddDagInt(
   DdNode * n,
   st__table * tab)
 {
     if (n == NIL(DdNode))
-        return(0);
+	return(0);
 
-    if ( st__is_member(tab, (char *)n) == 1)
-        return(0);
+    if (st__is_member(tab, n) == 1)
+	return(0);
 
-    if (Cudd_IsConstant(n))
-        return(0);
+    if (Cudd_IsConstantInt(n))
+	return(0);
 
-    (void) st__insert(tab, (char *)n, NIL(char));
+    (void)st__insert(tab, n, NIL(void));
     return(1 + cuddZddDagInt(cuddT(n), tab) +
-        cuddZddDagInt(cuddE(n), tab));
+	cuddZddDagInt(cuddE(n), tab));
 
 } /* cuddZddDagInt */
 
-
 ABC_NAMESPACE_IMPL_END
-

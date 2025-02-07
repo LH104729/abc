@@ -39,7 +39,27 @@ ABC_NAMESPACE_HEADER_START
 
 extern abctime              Extra_CpuTime();
 extern int                  Extra_GetSoftDataLimit();
-extern void               (*Extra_UtilMMoutOfMemory)( long size );
+extern void               (*Extra_UtilMMoutOfMemory)( unsigned long size );
+
+
+/**
+ * @def PRIszt
+ * @brief Format string for a size_t value.
+ */
+#if defined(_WIN32) && !defined(__USE_MINGW_ANSI_STDIO)
+#ifndef PRIuPTR
+#define PRIuPTR "Iu"
+#endif
+#ifndef PRIxPTR
+#define PRIxPTR "Ix"
+#endif
+#ifndef PRIiPTR
+#define PRIiPTR "Id"
+#endif
+#define PRIszt "Iu"
+#else
+#define PRIszt "zu"
+#endif
 
 ABC_NAMESPACE_HEADER_END
 
