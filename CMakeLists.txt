@@ -7,6 +7,8 @@ include(CheckCXXCompilerFlag)
 # Default c++ standard used unless otherwise specified in target_compile_features.
 set(CMAKE_CXX_STANDARD 17 CACHE STRING "the C++ standard to use for this project")
 set(CMAKE_CXX_STANDARD_REQUIRED ON)
+# set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -g -O0")
+# set(CMAKE_C_FLAGS "${CMAKE_CXX_FLAGS} -g -O0")
 
 function(addprefix var prefix)
     foreach( s ${ARGN} )

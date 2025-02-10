@@ -30,6 +30,8 @@
 
 #include "dddmpInt.h"
 
+ABC_NAMESPACE_IMPL_START
+
 /*---------------------------------------------------------------------------*/
 /* Stucture declarations                                                     */
 /*---------------------------------------------------------------------------*/
@@ -929,3 +931,5 @@ DddmpPrintBddAndNextRecur (
 }
 
 
+
+ABC_NAMESPACE_IMPL_END

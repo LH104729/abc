@@ -28,6 +28,8 @@
 
 #include "dddmpInt.h"
 
+ABC_NAMESPACE_IMPL_START
+
 /*---------------------------------------------------------------------------*/
 /* Stucture declarations                                                     */
 /*---------------------------------------------------------------------------*/
@@ -450,3 +452,5 @@ RestoreInUniqueRecurBdd (
 }
 
 
+
+ABC_NAMESPACE_IMPL_END

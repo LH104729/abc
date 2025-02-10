@@ -28,6 +28,8 @@
 #include <limits.h>
 #include "dddmpInt.h"
 
+ABC_NAMESPACE_IMPL_START
+
 /*-------------------------------1--------------------------------------------*/
 /* Stucture declarations                                                     */
 /*---------------------------------------------------------------------------*/
@@ -1576,3 +1578,5 @@ printCubeCnf (
 
 
 
+
+ABC_NAMESPACE_IMPL_END

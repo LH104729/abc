@@ -37,6 +37,8 @@
 
 #include "dddmpInt.h"
 
+ABC_NAMESPACE_IMPL_START
+
 /*---------------------------------------------------------------------------*/
 /* Stucture declarations                                                     */
 /*---------------------------------------------------------------------------*/
@@ -942,3 +944,5 @@ NodeTextStoreAdd (
     return (DDDMP_SUCCESS);
   }
 }
+
+ABC_NAMESPACE_IMPL_END

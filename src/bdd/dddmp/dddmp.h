@@ -40,9 +40,7 @@
 #include "misc/util/util_hack.h"
 #include "bdd/cudd/cudd.h"
 
-#ifdef __cplusplus
-extern "C" {
-#endif
+ABC_NAMESPACE_HEADER_START
 
 /*---------------------------------------------------------------------------*/
 /* Constant declarations                                                     */
@@ -323,8 +321,6 @@ extern int Dddmp_cuddBddArrayStoreSmv(DdManager *ddMgr, int nroots, DdNode **f, 
 
 /**AutomaticEnd***************************************************************/
 
-#ifdef __cplusplus
-}
-#endif
+ABC_NAMESPACE_HEADER_END
 
 #endif

@@ -38,6 +38,8 @@
 
 #include "dddmpInt.h"
 
+ABC_NAMESPACE_IMPL_START
+
 /*---------------------------------------------------------------------------*/
 /* Stucture declarations                                                     */
 /*---------------------------------------------------------------------------*/
@@ -1115,3 +1117,5 @@ NodeBinaryStoreBdd (
   return (retValue);
 }
 
+
+ABC_NAMESPACE_IMPL_END

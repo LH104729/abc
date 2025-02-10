@@ -35,6 +35,8 @@
 
 #include "dddmpInt.h"
 
+ABC_NAMESPACE_IMPL_START
+
 /*---------------------------------------------------------------------------*/
 /* Stucture declarations                                                     */
 /*---------------------------------------------------------------------------*/
@@ -341,3 +343,4 @@ ReadByteBinary (
 }
 
 
+ABC_NAMESPACE_IMPL_END

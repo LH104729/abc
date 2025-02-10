@@ -32,6 +32,8 @@
 
 #include "dddmpInt.h"
 
+ABC_NAMESPACE_IMPL_START
+
 /*---------------------------------------------------------------------------*/
 /* Stucture declarations                                                     */
 /*---------------------------------------------------------------------------*/
@@ -1520,3 +1522,5 @@ DddmpCuddDdArrayStoreSmvStep (
   }
 }
 
+
+ABC_NAMESPACE_IMPL_END

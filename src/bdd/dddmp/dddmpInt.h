@@ -40,9 +40,7 @@
 #include "dddmp.h"
 #include "bdd/cudd/cuddInt.h"
 
-#ifdef __cplusplus
-extern "C" {
-#endif
+ABC_NAMESPACE_HEADER_START
 
 /*---------------------------------------------------------------------------*/
 /* Constant declarations                                                     */
@@ -210,8 +208,6 @@ extern int DddmpIntArrayWrite(FILE *fp, int *array, int n);
 
 /**AutomaticEnd***************************************************************/
 
-#ifdef __cplusplus
-}
-#endif
+ABC_NAMESPACE_HEADER_END
 
 #endif

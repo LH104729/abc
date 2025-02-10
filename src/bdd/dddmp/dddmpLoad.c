@@ -38,6 +38,8 @@
 
 #include "dddmpInt.h"
 
+ABC_NAMESPACE_IMPL_START
+
 /*---------------------------------------------------------------------------*/
 /* Stucture declarations                                                     */
 /*---------------------------------------------------------------------------*/
@@ -1489,3 +1491,4 @@ DddmpFreeHeader (
 
 
 
+ABC_NAMESPACE_IMPL_END
