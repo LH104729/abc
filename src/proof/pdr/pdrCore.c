@@ -75,6 +75,7 @@ void Pdr_ManSetDefaultParams( Pdr_Par_t * pPars )
     pPars->fVerbose       =       0;  // verbose output
     pPars->fVeryVerbose   =       0;  // very verbose output
     pPars->fNotVerbose    =       0;  // not printing line-by-line progress
+    pPars->fTransRel      =       0;  // read input as transition relation
     pPars->iFrame         =      -1;  // explored up to this frame
     pPars->nFailOuts      =       0;  // the number of disproved outputs
     pPars->nDropOuts      =       0;  // the number of timed out outputs

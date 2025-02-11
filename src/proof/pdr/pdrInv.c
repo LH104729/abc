@@ -398,7 +398,17 @@ void Pdr_ManDumpClauses( Pdr_Man_t * p, char * pFileName, int fProved )
         fprintf( pFile, ".ilb" );
         for ( i = 0; i < Aig_ManRegNum(p->pAig); i++ )
             if ( !p->pPars->fUseSupp || Vec_IntEntry( vFlopCounts, i ) )
-                fprintf( pFile, " %s", pNamesCi[Saig_ManPiNum(p->pAig) + i] );
+            {
+                // If transition relation is used, the reg names should be "z" and the first half of the PI names
+                if (p->pPars->fTransRel){
+                    if (i == 0)
+                        fprintf( pFile, " z" );
+                    else
+                        fprintf( pFile, " %s", pNamesCi[i-1] );
+                }
+                else
+                    fprintf( pFile, " %s", pNamesCi[Saig_ManPiNum(p->pAig) + i] );
+            }
         fprintf( pFile, "\n" );
         ABC_FREE( pNamesCi );
         fprintf( pFile, ".ob inv\n" );
